@@ -1,0 +1,105 @@
+# Qwen3.8 Flash Next on DGX Spark / GB10.
+# Build from the repository root with scripts/build.sh. It fetches the blazux overlay at the pinned commit and passes it
+# to docker as the named build context "blazux":
+#   scripts/build.sh qwen3.8-flash-next
+#
+# Layers, in order:
+#   1. vLLM v0.31.0 (official image, pinned by digest)
+#   2. Qwen3.8 Flash Next overlay (blazux/qwen3.8-Flash-DGX @ 5108d90, steps 1-18) + two files rebased for v0.31
+#   3. think-eos-guard
+#   4. YaRN/mRoPE correction range (vLLM PR #58879)
+#   5. GB10 decode layer (FP8 LM head, fused shared-expert gate, GB10 router tier, FP8/FP4 weight-only linears)
+#   6. serve.py + profiles.json (entrypoint)
+# Every patch step fails the build if its anchor or hunk does not match.
+FROM vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+ARG SP=/usr/local/lib/python3.12/dist-packages
+ARG PKG=${SP}/vllm/models/qwen4_exp/nvidia
+ARG PLE=${PKG}/ngram_embedding.py
+ENV MAX_JOBS=2 FLASHINFER_NVCC_THREADS=1
+
+# ---- 2. Qwen3.8 Flash Next overlay (blazux) ----
+# 1. PLE n-gram table served from disk (VLLM_PLE_MMAP=1)
+COPY --from=blazux src/vllm_ple_mmap.py ${SP}/vllm_ple_mmap.py
+RUN cp ${PLE} ${PLE}.orig \
+ && printf '\n\n# --- serve the PLE n-gram table from disk (VLLM_PLE_MMAP=1) ---\nfrom vllm_ple_mmap import apply as _ple_mmap_apply\n_ple_mmap_apply(Qwen4ExpNGramEmbedding)\n' >> ${PLE} \
+ && python3 -c "import ast; ast.parse(open('${PLE}').read())"
+# 2. GB10 FLA fixes: shared-memory gate (99 KiB) and num_warps 2 in chunk_delta_h
+ARG FLA_UTILS=${SP}/vllm/third_party/flash_linear_attention/ops/utils.py
+ARG FLA_CDH=${SP}/vllm/third_party/flash_linear_attention/ops/chunk_delta_h.py
+RUN sed -i 's|DEFAULT = 102400|DEFAULT = 101376  # GB10: 99 KiB shared memory|' ${FLA_UTILS} && grep -q "GB10: 99 KiB" ${FLA_UTILS} \
+ && sed -i 's|for num_warps in \[2, 4\]|for num_warps in [2]  # GB10: fla#953|' ${FLA_CDH} && grep -q "fla#953" ${FLA_CDH}
+# 4. prefix caching: mamba block size
+COPY --from=blazux src/patch_mamba_block_size.py /tmp/
+RUN python3 /tmp/patch_mamba_block_size.py ${SP} && rm /tmp/patch_mamba_block_size.py
+# 5. exact QSA top-k fallback (VLLM_QSA_EXACT_TOPK=1)
+COPY --from=blazux src/patch_qsa_exact_topk.py /tmp/
+RUN python3 /tmp/patch_qsa_exact_topk.py ${PKG}/ops/qsa_indexer.py && rm /tmp/patch_qsa_exact_topk.py
+# 6. NVFP4 experts + blockwise-FP8 side layers (VLLM_FP8_HYBRID=1)
+ARG MO=${SP}/vllm/model_executor/layers/quantization/modelopt.py
+ARG QSA=${PKG}/qsa.py
+COPY --from=blazux src/vllm_fp8_hybrid_modelopt.py ${SP}/vllm_fp8_hybrid_modelopt.py
+RUN cp ${MO} ${MO}.orig \
+ && printf '\n\n# --- NVFP4 + blockwise-fp8 side layers (VLLM_FP8_HYBRID=1) ---\nfrom vllm_fp8_hybrid_modelopt import apply as _fp8_hybrid_apply\n_fp8_hybrid_apply()\n' >> ${MO} \
+ && python3 -c "import ast; ast.parse(open('${MO}').read())" \
+ && cp ${QSA} ${QSA}.orig \
+ && sed -i 's/quant_config=model\.without_modelopt_fp4(quant_config)/quant_config=_fp8_hybrid_excluded(quant_config)/' ${QSA} \
+ && sed -i 's/^from \. import model$/from . import model\nfrom vllm_fp8_hybrid_modelopt import excluded_quant_config as _fp8_hybrid_excluded/' ${QSA} \
+ && grep -q "_fp8_hybrid_excluded(quant_config)" ${QSA} && grep -q "^from vllm_fp8_hybrid_modelopt import" ${QSA} \
+ && python3 -c "import ast; ast.parse(open('${QSA}').read())"
+# 8. deterministic persistent_topk kernel (jschmied/qwen38-flash-next-gb10, vllm#55122), built with the image's nvcc
+ARG KDET=https://raw.githubusercontent.com/jschmied/qwen38-flash-next-gb10/e0ef69d4f5575dad00d34e05479eaf4c6547bace
+ADD --checksum=sha256:138cacfc5eb117f0922d53c88727e4d0dc26dcfb246c3d401fc280cfc726cc71 ${KDET}/patches/kernel-det/build_det.py /opt/llm/kernel-det/src/build_det.py
+ADD --checksum=sha256:b103fbeaf7589b9468471142ad0b30012a076f93d20ba11fc5ff6dcb1ecd32a6 ${KDET}/patches/kernel-det/bindings_det.cpp /opt/llm/kernel-det/src/bindings_det.cpp
+ADD --checksum=sha256:19e1d53425ea9a839445722fd1dac1c41727128eebdce84508c1bfb8592afecf ${KDET}/patches/kernel-det/topk_det.cu /opt/llm/kernel-det/src/topk_det.cu
+ADD --checksum=sha256:16939700ae389750782ff5c0d5b9caef59aa0ff8b869b64ec94fa72c814910ee ${KDET}/patches/kernel-det/torch_utils.h /opt/llm/kernel-det/src/torch_utils.h
+ADD --checksum=sha256:b4ef9ce298d43d6c0e6db9fcca451df20815b2cfe33791919c1ad9c0e84f0ba7 ${KDET}/patches/kernel-det/persistent_topk.cuh /opt/llm/kernel-det/src/persistent_topk.cuh
+COPY --from=blazux src/patch_qsadet.py /tmp/
+RUN cd /opt/llm/kernel-det/src && DET_BUILD_DIR=/opt/llm/kernel-det/build DET_ARCH=121a python3 build_det.py 2>&1 | tail -2 \
+ && cp /opt/llm/kernel-det/build/_C_det.so /opt/llm/kernel-det/_C_det.so \
+ && python3 /tmp/patch_qsadet.py ${PKG}/ops/qsa_indexer.py && rm /tmp/patch_qsadet.py \
+ && python3 -c "import ast; ast.parse(open('${PKG}/ops/qsa_indexer.py').read())"
+# 10. reduced draft vocabulary (65,536 tokens) for the MTP drafter (VLLM_MTP_DRAFT_VOCAB)
+COPY --from=blazux src/patch_mtp_draft_vocab.py /tmp/
+COPY --from=blazux src/draft_vocab_65536.npy /opt/llm/draft_vocab_65536.npy
+RUN python3 /tmp/patch_mtp_draft_vocab.py ${PKG}/mtp.py && rm /tmp/patch_mtp_draft_vocab.py
+# 12+13. Qwen tool preamble; quoted tool markers stay text (rebased for v0.31)
+COPY models/qwen3.8-flash-next/overlay/patches/qwen-tool-12-13-v031.diff /tmp/qwen-tool-12-13.diff
+RUN cd ${SP} && patch --batch --forward --fuzz=0 -p1 < /tmp/qwen-tool-12-13.diff && rm /tmp/qwen-tool-12-13.diff
+# 14. MoE weight loading: clone the mmap view before the host-to-device copy (rebased for v0.31; VLLM_LOAD_CLONE=0 disables)
+COPY models/qwen3.8-flash-next/overlay/patch_moe_load_clone_v031.py /tmp/patch_moe_load_clone.py
+RUN python3 /tmp/patch_moe_load_clone.py ${SP} && rm /tmp/patch_moe_load_clone.py
+# 15, 17, 18. weight loading: pread small tensors, chunked embedding copy, MTP name prefilter
+COPY --from=blazux src/patch_load_pread.py src/patch_embed_chunked_copy.py src/patch_mtp_name_prefilter.py /tmp/
+RUN python3 /tmp/patch_load_pread.py ${SP} && python3 /tmp/patch_embed_chunked_copy.py ${SP} && python3 /tmp/patch_mtp_name_prefilter.py ${SP} \
+ && rm /tmp/patch_load_pread.py /tmp/patch_embed_chunked_copy.py /tmp/patch_mtp_name_prefilter.py
+
+# ---- 3. think-eos-guard ----
+COPY gb10/think-eos-guard/serving_think_guard.diff /tmp/serving_think_guard.diff
+COPY gb10/think-eos-guard/think_guard.py ${SP}/vllm/entrypoints/openai/chat_completion/think_guard.py
+RUN cd ${SP} && patch -p1 --forward --no-backup-if-mismatch < /tmp/serving_think_guard.diff && rm -f /tmp/serving_think_guard.diff \
+ && rm -f vllm/entrypoints/openai/chat_completion/__pycache__/serving.*.pyc \
+ && grep -q "wrap_generate" vllm/entrypoints/openai/chat_completion/serving.py
+
+# ---- 4. YaRN / mRoPE correction range (vLLM PR #58879) ----
+COPY gb10/yarn-mrope-58879/yarn_mrope_58879.diff /tmp/yarn.diff
+COPY gb10/yarn-mrope-58879/test_yarn_mrope.py /opt/vllm-dgx-spark/test_yarn_mrope.py
+RUN cd ${SP} && patch -p1 --forward --no-backup-if-mismatch < /tmp/yarn.diff && rm -f /tmp/yarn.diff \
+ && rm -f vllm/model_executor/layers/rotary_embedding/__pycache__/mrope.*.pyc vllm/model_executor/layers/rotary_embedding/__pycache__/yarn_scaling_rope.*.pyc \
+ && grep -q "original_max_position_embeddings = max_position_embeddings" vllm/model_executor/layers/rotary_embedding/mrope.py
+
+# ---- 5. GB10 decode layer ----
+COPY gb10/gb10-decode/gb10_kernels.py gb10/gb10-decode/apply_gb10.py gb10/gb10-decode/bench_kernels.py gb10/gb10-decode/bench_fp4.py /opt/vllm-dgx-spark/gb10/
+RUN python3 /opt/vllm-dgx-spark/gb10/apply_gb10.py ${SP}/vllm \
+ && find ${SP}/vllm -name "*.pyc" \( -path "*logits_processor*" -o -path "*qwen2_moe*" -o -path "*gate_linear*" -o -path "*qwen4_exp*" \) -delete \
+ && find ${SP}/vllm/model_executor/layers -maxdepth 2 -name "linear.*.pyc" -delete
+
+# ---- 6. entrypoint ----
+COPY models/qwen3.8-flash-next/serve.py models/qwen3.8-flash-next/profiles.json /opt/vllm-dgx-spark/
+LABEL org.opencontainers.image.title="vllm-dgx-spark-gb10: Qwen3.8 Flash Next" \
+      org.opencontainers.image.source="https://github.com/Monolith-ApS/vllm-dgx-spark-gb10" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="Monolith ApS (https://www.monolith.dk/en)" \
+      org.opencontainers.image.authors="Carsten Berggreen (https://berggreens.dk/en/)" \
+      org.opencontainers.image.base.name="vllm/vllm-openai:v0.31.0"
+EXPOSE 8000
+ENTRYPOINT ["python3", "/opt/vllm-dgx-spark/serve.py"]

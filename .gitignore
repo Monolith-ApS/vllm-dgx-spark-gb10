@@ -1,0 +1,31 @@
+# build workspace (scripts/build.sh clones the blazux overlay here)
+.build/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# test results written by tools/
+*.jsonl
+*.log
+
+# local settings and secrets - never commit
+.env
+.env.*
+*.token
+
+# model weights and caches belong in /data, not in the repository
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+.cache/
+
+# editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

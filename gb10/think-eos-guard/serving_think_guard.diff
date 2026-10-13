@@ -1,0 +1,55 @@
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 06e7315..c24aa3c 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -57,6 +57,7 @@ from vllm.entrypoints.serve.utils.tool_calls_utils import (
+ from vllm.exceptions import GenerationError
+ from vllm.inputs import EngineInput, MultiModalPlaceholders
+ from vllm.logger import init_logger
++from vllm.entrypoints.openai.chat_completion.think_guard import wrap_generate  # think-guard
+ from vllm.logprobs import Logprob
+ from vllm.outputs import RequestOutput
+ from vllm.parser import ParserManager
+@@ -365,23 +366,28 @@ class OpenAIServingChat(GenerateBaseServing):
+                 else:
+                     reasoning_ended = None
+ 
+-                generator = self.engine_client.generate(
++                generator = wrap_generate(
++                    self.engine_client.generate,
+                     engine_input,
+                     sampling_params,
+                     sub_request_id,
+-                    lora_request=lora_request,
+-                    trace_headers=trace_headers,
+-                    priority=self._get_priority(request, raw_request),
+-                    data_parallel_rank=data_parallel_rank,
+-                    session_id=session_id,
+-                    reasoning_ended=reasoning_ended,
+-                    reasoning_parser_kwargs={
+-                        "chat_template_kwargs": self._engine_chat_template_kwargs(
+-                            chat_template_kwargs
+-                        ),
+-                    }
+-                    if parser is not None and parser.reasoning_parser is not None
+-                    else None,
++                    dict(
++                        lora_request=lora_request,
++                        trace_headers=trace_headers,
++                        priority=self._get_priority(request, raw_request),
++                        data_parallel_rank=data_parallel_rank,
++                        session_id=session_id,
++                        reasoning_ended=reasoning_ended,
++                        reasoning_parser_kwargs={
++                            "chat_template_kwargs": self._engine_chat_template_kwargs(
++                                chat_template_kwargs
++                            ),
++                        }
++                        if parser is not None and parser.reasoning_parser is not None
++                        else None,
++                    ),
++                    tokenizer,
++                    request,
+                 )
+ 
+             generators.append(generator)
