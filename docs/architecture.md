@@ -60,7 +60,7 @@ flowchart TB
         T3["draft head: reduced vocabulary 65,536, FP8 rows (image)"]
         T4["KV cache: BF16 (layer 48 skipped from FP8 KV)"]
     end
-    VIS["Vision encoder: BF16 (checkpoint), not used for text"]
+    VIS["Vision encoder (image input): BF16 (checkpoint), idle for text-only requests"]
 ```
 
 | Component | Checkpoint | Served as | Switch |
@@ -81,3 +81,7 @@ flowchart TB
 | Gated DeltaNet recurrent state | FP32 | FP32 | - |
 
 Weight-only means activations stay BF16; weights are dequantized inside the GEMM kernels.
+
+The vision encoder (0.84 GiB) is loaded at start and runs only for requests that contain images. An image costs one
+token per 32x32 pixels (16-pixel patches, 2x2 merge): at least 64 tokens, 768 for 1024x768, at most 16,384 (larger
+images are scaled down). The MTP drafter is text-only.
