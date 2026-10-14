@@ -115,8 +115,10 @@ and the software.
 Apache-2.0 (see `LICENSE`). Third-party sources and credits: `NOTICE`. The model weights are not part of this repository;
 their use is governed by the license on the model card of `nvidia/Qwen3.8-Flash-Next-NVFP4`.
 
-Provided as is, without warranty of any kind, including correctness, fitness for a particular purpose, security or
-non-infringement (Apache-2.0, sections 7 and 8).
+**Use at your own risk.** This repository is provided as is, without warranty of any kind, including correctness, fitness
+for a particular purpose, security or non-infringement. Monolith ApS and the contributors are not liable for any damage or
+loss arising from its use, including loss or corruption of data, downtime, damage to hardware or software, and wrong,
+incomplete or harmful model output or decisions based on it (see also Apache-2.0, sections 7 and 8).
 
 Report reproducible problems in a GitHub issue. Do not include API keys, tokens, passwords or private data.
 
