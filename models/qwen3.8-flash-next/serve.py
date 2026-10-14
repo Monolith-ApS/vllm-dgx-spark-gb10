@@ -12,6 +12,7 @@ Environment:
   GMU            override the profile's gpu_memory_utilization
   DRY_RUN=1      print the vLLM command line and environment instead of starting it
   LOAD_FORMAT    weight loader (default instanttensor; safetensors also works)
+  MTP            speculative draft tokens (default 7, with thinking 3)
 
 Extra arguments to the container are appended to the vLLM command line (later flags win).
 """
@@ -77,7 +78,8 @@ def main():
     if not os.path.isfile(os.path.join(model, "config.json")):
         sys.exit("no model at %s (mount the model directory, see scripts/get-model.sh)" % model)
 
-    spec = {"method": "mtp", "num_speculative_tokens": int(p.get("mtp", 7))}
+    # MTP draft depth: 7 without thinking, 3 with thinking (reasoning text accepts fewer draft tokens); MTP overrides both
+    spec = {"method": "mtp", "num_speculative_tokens": int(os.environ.get("MTP") or (3 if thinking else 7))}
     argv = ["vllm", "serve", model, "--served-model-name", served, "--host", "0.0.0.0", "--port", os.environ.get("PORT", "8000"),
             "--max-model-len", str(ctx), "--max-num-seqs", str(seqs), "--gpu-memory-utilization", "%.2f" % gmu,
             "--max-num-batched-tokens", str(p.get("max_num_batched_tokens", 4096)),

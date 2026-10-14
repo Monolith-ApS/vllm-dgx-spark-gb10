@@ -54,7 +54,7 @@ flowchart TB
     end
     L --> LMH["lm_head<br/>FP8 rows + FP32 row scale (image)"]
     L --> MTP
-    subgraph MTP["MTP drafter (1 layer, 7 speculative tokens)"]
+    subgraph MTP["MTP drafter (1 layer, 7 speculative tokens, 3 with thinking)"]
         T1["routed experts: FP8 block-scaled (checkpoint)"]
         T2["attention, shared expert, fc_hidden: FP8 weight-only (image)"]
         T3["draft head: reduced vocabulary 65,536, FP8 rows (image)"]

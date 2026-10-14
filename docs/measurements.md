@@ -46,8 +46,20 @@ Every profile: tool calling (`tools/tool_check.py`, 9 cases x 2) 18/18; control 
 
 ## Thinking on vs off
 
-`tools/taskbench.py`: 10 single-prompt Python tasks with hidden tests, one run each, 1 request at a time,
-`512k-c3`.
+`tools/taskbench.py`: 10 single-prompt Python tasks with hidden tests, one run each, 1 request at a time.
+
+MTP draft depth with thinking on (`1024k-c1-think`, 24,000-token cap per task):
+
+| MTP draft tokens | Decode speed | Mean accepted length | Tasks passed | Total time |
+|---|---|---|---|---|
+| 3 (`-think` default) | 43.4 tok/s | 2.27 | 7/10 | 2,384 s |
+| 5 | 39.6 tok/s | 2.63 | 9/10 | 2,296 s |
+| 7 | 35.1 tok/s | 2.65 | 9/10 | 2,576 s |
+
+MTP 3 was the fastest on 9 of the 10 tasks. The draft depth does not change what the model generates; the failed tasks
+reached the 24,000-token cap without an answer.
+
+Thinking on vs off, MTP 7, `512k-c3`:
 
 | | Thinking off | Thinking on |
 |---|---|---|

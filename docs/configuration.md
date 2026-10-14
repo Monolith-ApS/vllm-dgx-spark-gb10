@@ -33,6 +33,7 @@ For `scripts/run.sh` and the container:
 | `PORT` | `8000` | host port |
 | `API_KEY` | none | when set, clients must send it as Bearer token |
 | `GMU` | profile value | override gpu_memory_utilization |
+| `MTP` | `7`, with thinking `3` | speculative (MTP) draft tokens per step |
 | `DRY_RUN` | `0` | `1` prints the vLLM command line instead of starting |
 
 `scripts/run.sh` also reads `DATA_DIR`, `MODEL_DIR`, `IMAGE` and `NAME` (container name, default `qwen38-flash-next`).
@@ -53,6 +54,10 @@ Server-wide default sampling, chosen by `THINKING` at start; a request can overr
 |---|---|---|---|---|---|
 | `0` | 1.0 | 0.95 | 20 | 0.0 | - |
 | `1` | 0.8 | 0.95 | 20 | 0.0 | 1.0 |
+
+With thinking on by default (`-think` or `THINKING=1`) the server uses 3 MTP draft tokens instead of 7: reasoning text
+accepts fewer draft tokens, so the shorter draft decodes faster ([measurements.md](measurements.md#thinking-on-vs-off)).
+Requests that turn thinking on against a non-thinking profile run with 7.
 
 Reasoning text is returned in `reasoning` (streaming: `delta.reasoning`), separate from `content`. Speed and results with thinking on vs off:
 [measurements.md](measurements.md#thinking-on-vs-off).
