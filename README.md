@@ -90,9 +90,35 @@ Details per profile: [docs/measurements.md](docs/measurements.md).
 | [docs/tools.md](docs/tools.md) | test tools to verify your own machine |
 | [docs/building.md](docs/building.md) | pinned versions and repository layout |
 
-## License
+## Limitations and responsibility
 
-Apache-2.0 (see `LICENSE`). Third-party sources and credits: `NOTICE`.
+- Model output - answers, code, commands, tool calls - can be wrong, incomplete, outdated or made up. Review it before you
+  rely on it, and run generated code and agent tool calls only in isolated environments you are allowed to use.
+- The measurements come from one DGX Spark with the versions pinned in this repository. Another driver/CUDA version, OS
+  image, model revision, sampling settings, speculative decoding settings or agent framework can change speed, memory
+  headroom and model behaviour.
+- The image stores some model components at lower precision than the checkpoint (FP8 KV cache, FP8 and NVFP4 weights; see
+  [docs/architecture.md](docs/architecture.md)). Quality was checked only with the tests in
+  [docs/measurements.md](docs/measurements.md) (tool calling, control prompts, small coding tasks, capacity fills). That does
+  not show the model is as good as the original on every task, nor quality at long context beyond what those tests cover
+  (contexts above 256K use YaRN scaling).
+- The profiles use most of the 128 GB unified memory. Other processes on the machine reduce the headroom, and on GB10 running
+  out of memory can freeze the whole machine until it is power cycled.
+- The server is not a security boundary. By default the API needs no key and port 8000 is published on all interfaces: set
+  `API_KEY` and keep the port off networks you do not trust.
+
+Whoever runs it is responsible for access control, network exposure, monitoring, and following the licenses of the model
+and the software.
+
+## License and disclaimer
+
+Apache-2.0 (see `LICENSE`). Third-party sources and credits: `NOTICE`. The model weights are not part of this repository;
+their use is governed by the license on the model card of `nvidia/Qwen3.8-Flash-Next-NVFP4`.
+
+Provided as is, without warranty of any kind, including correctness, fitness for a particular purpose, security or
+non-infringement (Apache-2.0, sections 7 and 8).
+
+Report reproducible problems in a GitHub issue. Do not include API keys, tokens, passwords or private data.
 
 Copyright 2026 Monolith ApS (https://www.monolith.dk/en)
 
