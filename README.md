@@ -63,14 +63,14 @@ PROFILE=256k-c5 scripts/run.sh
 
 | Profile | Context | Conversations at full context | Decode, 1 request | Decode, all conversations at once (total) |
 |---|---|---|---|---|
-| `128k-c8` | 128K | 8 | 80-82 tok/s | 222-238 tok/s |
-| `256k-c5` | 256K | 5 | 79 tok/s | 175-193 tok/s |
-| `384k-c4` | 384K | 4 | 77-78 tok/s | 161-172 tok/s |
-| `480k-c3` | 480K | 3 | 77-79 tok/s | 140-148 tok/s |
-| `512k-c3` (default) | 512K | 3 | 78-79 tok/s | 139-148 tok/s |
-| `640k-c2` | 640K | 2 | 75-78 tok/s | 110-118 tok/s |
-| `768k-c2` | 768K | 2 | 79-80 tok/s | 115-118 tok/s |
-| `1024k-c1` | 1M | 1 | 79-83 tok/s | - |
+| `128k-c8` | 128K | 8 | 75-79 tok/s | 223-256 tok/s |
+| `256k-c5` | 256K | 5 | 79-82 tok/s | 178-189 tok/s |
+| `384k-c4` | 384K | 4 | 79-83 tok/s | 165-176 tok/s |
+| `480k-c3` | 480K | 3 | 79-80 tok/s | 139-149 tok/s |
+| `512k-c3` (default) | 512K | 3 | 79-80 tok/s | 141-152 tok/s |
+| `640k-c2` | 640K | 2 | 73-79 tok/s | 112-118 tok/s |
+| `768k-c2` | 768K | 2 | 79-83 tok/s | 116-118 tok/s |
+| `1024k-c1` | 1M | 1 | 78-79 tok/s | - |
 
 Every profile passed the capacity test: all conversations filled to the full context window at the same time, without
 evictions. Any profile also runs with thinking on by default: add `-think` (`PROFILE=1024k-c1-think`). For thinking,

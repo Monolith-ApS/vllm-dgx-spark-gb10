@@ -3,6 +3,11 @@
 NVIDIA DGX Spark (GB10, 128 GB, DGX OS), the image built from this repository, MTP 7, thinking off unless stated. One profile
 at a time, nothing else running.
 
+Decode speed, capacity, tool calling and control prompts: measured 2026-10-22 on DGX OS with the 7.0 kernel
+(7.0.0-1019-nvidia), NVIDIA driver 580.178.04 and the 2026-10 platform firmware (EC 0x03000d07, SoC 0x02009e0f). Same vLLM
+build, patches and command line per profile as the image; the requests went through an OpenAI-compatible proxy on the
+local network. See [Platform update](#platform-update-2026-10) for the change against the first measurement (2026-10-13).
+
 ## Decode speed
 
 Code-writing test: "edit" returns a 250-line C file with small changes (3,000 completion tokens), "new" writes a new C module
@@ -11,14 +16,16 @@ throughput.
 
 | Profile | 1 request, edit | 1 request, new | All at once, edit | All at once, new |
 |---|---|---|---|---|
-| `128k-c8` | 79.7 tok/s | 82.0 tok/s | 222.3 tok/s (8) | 238.2 tok/s (8) |
-| `256k-c5` | 78.7 | 78.7 | 175.0 (5) | 193.0 (5) |
-| `384k-c4` | 77.1 | 78.4 | 161.4 (4) | 171.7 (4) |
-| `480k-c3` | 76.8 | 79.0 | 140.2 (3) | 148.4 (3) |
-| `512k-c3` | 78.3 | 79.1 | 138.8 (3) | 148.3 (3) |
-| `640k-c2` | 78.1 | 75.0 | 117.8 (2) | 109.6 (2) |
-| `768k-c2` | 78.8 | 79.8 | 118.1 (2) | 115.2 (2) |
-| `1024k-c1` | 79.1 | 82.9 | - | - |
+| `128k-c8` | 79.3 tok/s | 75.2 tok/s | 223.1 tok/s (8) | 256.1 tok/s (8) |
+| `256k-c5` | 78.9 | 81.6 | 177.6 (5) | 189.1 (5) |
+| `384k-c4` | 79.4 | 82.8 | 164.6 (4) | 176.4 (4) |
+| `480k-c3` | 78.8 | 80.0 | 138.7 (3) | 148.9 (3) |
+| `512k-c3` | 79.1 | 79.7 | 140.6 (3) | 151.8 (3) |
+| `640k-c2` | 79.2 | 72.9 | 117.7 (2) | 112.3 (2) |
+| `768k-c2` | 79.1 | 82.9 | 116.4 (2) | 117.7 (2) |
+| `1024k-c1` | 78.3 | 78.9 | - | - |
+
+One run per cell; single runs of the same test vary by a few percent (up to ~8 % for "new").
 
 ## Capacity
 
@@ -27,22 +34,35 @@ pass = 0 preemptions and slowest time to first token of that final turn <= 30 s.
 
 | Profile | KV cache size | Needed (sessions x (context - 6,000)) | Sessions filled to | Preemptions | Time to first token, final turn | MemAvailable after start / after fill | Ready after |
 |---|---|---|---|---|---|---|---|
-| `128k-c8` | 1,000,913 tokens | 1,000,576 | 103-115K x 8 | 0 | 5.5-23.5 s | 6.1 GiB / 4.9 GiB | 172 s |
-| `256k-c5` | 1,394,334 | 1,280,720 | 237-245K x 5 | 0 | 5.3-15.3 s | 5.0 GiB / 7.5 GiB | 172 s |
-| `384k-c4` | 1,557,642 | 1,548,864 | 369-375K x 4 | 0 | 7.3-14.8 s | 5.0 GiB / 7.5 GiB | 172 s |
-| `480k-c3` | 1,586,754 | 1,456,560 | 464-474K x 3 | 0 | 4.8-8.3 s | 6.0 GiB / 4.5 GiB | 172 s |
-| `512k-c3` | 1,599,889 | 1,554,864 | 498-504K x 3 | 0 | 6.3-11.2 s | 6.0 GiB / 4.4 GiB | 172 s |
-| `640k-c2` | 1,651,057 | 1,298,720 | 636-639K x 2 | 0 | 5.3-6.8 s | 6.1 GiB / 4.6 GiB | 161 s |
-| `768k-c2` | 1,700,080 | 1,560,864 | 760-769K x 2 | 0 | 6.5-9.0 s | 5.8 GiB / 4.5 GiB | 161 s |
-| `1024k-c1` | 1,686,709 | 1,042,576 | 1,028K x 1 | 0 | 7.2 s | 7.7 GiB / 5.6 GiB | 161 s |
+| `128k-c8` | 1,016,233 tokens | 1,000,576 | 103-115K x 8 | 0 | 4.4-21.6 s | 5.6 GiB / 4.9 GiB | 130 s |
+| `256k-c5` | 1,412,413 | 1,280,720 | 237-245K x 5 | 0 | 5.0-15.3 s | 4.5 GiB / 3.7 GiB | 130 s |
+| `384k-c4` | 1,570,327 | 1,548,864 | 369-375K x 4 | 0 | 4.9-12.2 s | 4.7 GiB / 3.9 GiB | 127 s |
+| `480k-c3` | 1,586,754 | 1,456,560 | 464-474K x 3 | 0 | 5.5-8.8 s | 5.9 GiB / 4.9 GiB | 130 s |
+| `512k-c3` | 1,597,186 | 1,554,864 | 498-504K x 3 | 0 | 7.0-11.3 s | 6.0 GiB / 5.0 GiB | 124 s |
+| `640k-c2` | 1,676,371 | 1,298,720 | 636-639K x 2 | 0 | 5.4-6.9 s | - / 4.7 GiB | 127 s |
+| `768k-c2` | 1,714,537 | 1,560,864 | 760-769K x 2 | 0 | 8.1-8.7 s | 5.9 GiB / 4.7 GiB | 124 s |
+| `1024k-c1` | 1,683,713 | 1,042,576 | 1,028K x 1 | 0 | 5.7 s | 7.7 GiB / 6.1 GiB | 127 s |
 
-Ready after = container start to API ready, weights in the page cache, compile cache warm.
+Ready after = container start to API ready, weights in the page cache, compile cache warm (an existing, stopped container
+started again; 2026-10-13 counted from `docker run` with 10 s polling, 161-172 s). `640k-c2`: MemAvailable after start was
+not read.
 
 Mamba cache mode on `512k-c3`: `all` and `align` gave the same KV cache size, decode speed and fill result.
 
 ## Tool calling and control prompts
 
 Every profile: tool calling (`tools/tool_check.py`, 9 cases x 2) 18/18; control prompts (`tools/answer_check.py`) 4/4.
+
+## Platform update (2026-10)
+
+All profiles were measured twice: 2026-10-13 and 2026-10-22, after the DGX OS update to the 7.0 kernel, driver 580.178.04
+and new platform firmware. Same image, model and command lines. Nothing changed beyond run-to-run variation:
+
+- Decode, 1 request: -8.3 % to +5.6 % per cell, mean +0.4 %. The largest moves are single "new" runs (`128k-c8` 82.0 -> 75.2,
+  `384k-c4` 78.4 -> 82.8).
+- Decode, all at once: -2.0 % to +7.5 % per cell, mean +1.3 %.
+- KV cache size: -0.2 % to +1.6 %. Every profile still holds all its sessions at full context with 0 preemptions.
+- Tool calling 18/18 and control prompts 4/4 on every profile, both times.
 
 ## Thinking on vs off
 
