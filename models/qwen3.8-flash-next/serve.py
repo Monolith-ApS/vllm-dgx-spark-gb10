@@ -48,6 +48,21 @@ BASE_ENV = {
     "VLLM_GB10_FP4_WEIGHTS": "1",
 }
 
+# What differs between the vLLM releases this image is built on (Dockerfile.vllm-<release>), as measured on the Spark.
+RELEASE_SETTINGS = {
+    "0.31": {"moe_backend": "marlin", "mamba_cache_mode": {}, "splitting_ops_after": {}},
+    # 0.32: the Humming MoE kernels (the backend the 0.32 measurements used), mamba cache mode "all" is gone ("align"
+    # takes its place), and the QSA K/V prepare is a separate op that must be a graph split point like the QSA op.
+    "0.32": {"moe_backend": "humming", "mamba_cache_mode": {"all": "align"},
+             "splitting_ops_after": {"vllm::qwen4_exp_ple_short_conv": "vllm::qwen4_exp_qsa_prepare_with_output"}},
+}
+
+
+def vllm_release():
+    from importlib.metadata import version
+    return ".".join(version("vllm").split(".")[:2])
+
+
 SAMPLING = {
     False: {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0},
     True: {"temperature": 0.8, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 1.0},
@@ -78,20 +93,30 @@ def main():
     if not os.path.isfile(os.path.join(model, "config.json")):
         sys.exit("no model at %s (mount the model directory, see scripts/get-model.sh)" % model)
 
+    release = vllm_release()
+    if release not in RELEASE_SETTINGS:
+        sys.exit("vLLM %s: this entrypoint knows %s" % (release, ", ".join(RELEASE_SETTINGS)))
+    rs = RELEASE_SETTINGS[release]
+    splitting_ops = []
+    for op in SPLITTING_OPS:
+        splitting_ops.append(op)
+        if op in rs["splitting_ops_after"]:
+            splitting_ops.append(rs["splitting_ops_after"][op])
+
     # MTP draft depth: 7 without thinking, 3 with thinking (reasoning text accepts fewer draft tokens); MTP overrides both
     spec = {"method": "mtp", "num_speculative_tokens": int(os.environ.get("MTP") or (3 if thinking else 7))}
     argv = ["vllm", "serve", model, "--served-model-name", served, "--host", "0.0.0.0", "--port", os.environ.get("PORT", "8000"),
             "--max-model-len", str(ctx), "--max-num-seqs", str(seqs), "--gpu-memory-utilization", "%.2f" % gmu,
             "--max-num-batched-tokens", str(p.get("max_num_batched_tokens", 4096)),
             "--enable-prefix-caching", "--enable-chunked-prefill",
-            "-cc.cudagraph_mode=PIECEWISE", "-cc.splitting_ops=" + compact(SPLITTING_OPS), "--no-enable-flashinfer-autotune",
+            "-cc.cudagraph_mode=PIECEWISE", "-cc.splitting_ops=" + compact(splitting_ops), "--no-enable-flashinfer-autotune",
             "--kv-cache-dtype", "fp8_e4m3", "--kv-cache-dtype-skip-layers", "48",
             "--enable-auto-tool-choice", "--tool-call-parser", "qwen3_coder", "--reasoning-parser", "qwen3",
-            "--moe-backend", "marlin", "--block-size", "1680", "--load-format", os.environ.get("LOAD_FORMAT", "instanttensor"),
+            "--moe-backend", rs["moe_backend"], "--block-size", "1680", "--load-format", os.environ.get("LOAD_FORMAT", "instanttensor"),
             "--override-generation-config", compact(SAMPLING[thinking]),
             "--default-chat-template-kwargs", compact({"enable_thinking": thinking})]
     if p.get("mamba_cache_mode"):
-        argv += ["--mamba-cache-mode", p["mamba_cache_mode"]]
+        argv += ["--mamba-cache-mode", rs["mamba_cache_mode"].get(p["mamba_cache_mode"], p["mamba_cache_mode"])]
     env = dict(BASE_ENV)
     if ctx > NATIVE_CONTEXT:  # YaRN above the native context
         factor = ctx / NATIVE_CONTEXT
@@ -111,7 +136,7 @@ def main():
         print(" ".join(argv))
         print(json.dumps({k: os.environ[k] for k in env}, indent=1))
         return 0
-    print("profile %s: context %d, concurrency %d, gmu %.2f, thinking %s" % (name, ctx, seqs, gmu, "on" if thinking else "off"), flush=True)
+    print("profile %s: context %d, concurrency %d, gmu %.2f, thinking %s, vLLM %s" % (name, ctx, seqs, gmu, "on" if thinking else "off", release), flush=True)
     os.execvp(argv[0], argv)
 
 

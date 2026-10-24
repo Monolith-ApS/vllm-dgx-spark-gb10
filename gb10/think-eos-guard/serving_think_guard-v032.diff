@@ -1,0 +1,44 @@
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index b291ec6e8a..ae8be0a8bb 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -52,6 +52,7 @@ from vllm.entrypoints.serve.utils.tool_calls_utils import (
+ from vllm.exceptions import GenerationError
+ from vllm.inputs import EngineInput, MultiModalPlaceholders
+ from vllm.logger import init_logger
++from vllm.entrypoints.openai.chat_completion.think_guard import wrap_generate  # think-guard
+ from vllm.logprobs import Logprob
+ from vllm.outputs import RequestOutput
+ from vllm.parser import ParserManager
+@@ -386,18 +387,23 @@ class OpenAIServingChat(GenerateBaseServing):
+                     session_id=session_id,
+                 )
+             else:
+-                generator = self.engine_client.generate(
++                generator = wrap_generate(
++                    self.engine_client.generate,
+                     engine_input,
+                     sampling_params,
+                     sub_request_id,
+-                    lora_request=lora_request,
+-                    trace_headers=trace_headers,
+-                    priority=self._get_priority(request, raw_request),
+-                    data_parallel_rank=data_parallel_rank,
+-                    session_id=session_id,
+-                    **self._engine_reasoning_kwargs(
+-                        request, parser, chat_template_kwargs, prompt_token_ids
++                    dict(
++                        lora_request=lora_request,
++                        trace_headers=trace_headers,
++                        priority=self._get_priority(request, raw_request),
++                        data_parallel_rank=data_parallel_rank,
++                        session_id=session_id,
++                        **self._engine_reasoning_kwargs(
++                            request, parser, chat_template_kwargs, prompt_token_ids
++                        ),
+                     ),
++                    tokenizer,
++                    request,
+                 )
+ 
+             generators.append(generator)

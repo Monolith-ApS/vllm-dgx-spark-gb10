@@ -7,6 +7,7 @@ One request at a time (c1). Per run: TTFT, time to the first answer token (after
 reasoning characters, decode tok/s (completion tokens / time after the first token), hidden tests passed/total.
 Sampling per mode = the masters' defaults: think 0.8/0.95/20 + presence 1.0 (think-kvfp8 spec), nothink 1.0/0.95/20 (kvfp8 spec).
 The generated code runs locally in a subprocess (python -I, temp dir, 20 s timeout).
+Key from LLM_API_KEY (default 'none'), as in the other tools; never printed.
 """
 import json, os, re, subprocess, sys, tempfile, time, urllib.request
 
@@ -144,7 +145,7 @@ def ask(url, model, prompt, mode):
     body = {"model": model, "messages": [{"role": "user", "content": prompt + TAIL}], "max_tokens": 24000, "stream": True,
             "stream_options": {"include_usage": True}, "chat_template_kwargs": {"enable_thinking": mode == "think"}, **SAMPLING[mode]}
     req = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json", "Authorization": "Bearer local"})
+                                 headers={"Content-Type": "application/json", "Authorization": "Bearer " + (os.environ.get("LLM_API_KEY") or "none")})
     t0 = time.time()
     ttft = tans = None
     reasoning, content, usage = [], [], {}

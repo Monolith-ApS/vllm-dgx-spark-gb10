@@ -3,7 +3,8 @@
 when the model calls exactly the expected tools with the expected arguments (or answers without a tool when none is
 needed). Multi-turn cases feed a tool result back and check the follow-up call. Prints one JSON line per case and a
 summary. Key from LLM_API_KEY (default 'none'); never printed.
-usage: python tool_check.py --model <served-model> [--repeats 3] [--label x]"""
+usage: python tool_check.py --model <served-model> [--repeats 3] [--parallel 1] [--label x]
+--parallel: requests at the same time (default 1 = one after the other); keep it at or below the profile's concurrency."""
 import argparse, json, os, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -89,6 +90,7 @@ def check(msg, expected):
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", required=True)
 ap.add_argument("--repeats", type=int, default=3)
+ap.add_argument("--parallel", type=int, default=1, help="requests at the same time; at most the server's concurrency")
 ap.add_argument("--label", default="")
 a = ap.parse_args()
 total = passed = 0
@@ -105,7 +107,7 @@ def run(job):
     return name, i, ok, why, round(time.time() - t0, 1)
 
 
-with ThreadPoolExecutor(4) as ex:
+with ThreadPoolExecutor(max(1, a.parallel)) as ex:
     res = list(ex.map(run, jobs))
 by = {}
 for name, i, ok, why, s in res:

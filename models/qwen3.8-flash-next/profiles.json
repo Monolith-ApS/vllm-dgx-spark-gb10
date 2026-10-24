@@ -2,7 +2,7 @@
   "_comment": "context = tokens per conversation, concurrency = conversations at full context at the same time. status: measured = passed the full fill test (tools/fillc.py) with this image; not measured = expected to fit, not yet run.",
   "profiles": {
     "128k-c8": {"context": 131072, "concurrency": 8, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "256k-c5": {"context": 262144, "concurrency": 5, "gpu_memory_utilization": 0.9, "mamba_cache_mode": "all", "status": "measured"},
+    "256k-c5": {"context": 262144, "concurrency": 5, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
     "384k-c4": {"context": 393216, "concurrency": 4, "gpu_memory_utilization": 0.9, "mamba_cache_mode": "all", "status": "measured"},
     "480k-c3": {"context": 491520, "concurrency": 3, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
     "512k-c3": {"context": 524288, "concurrency": 3, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},

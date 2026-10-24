@@ -1,17 +1,20 @@
-# Qwen3.8 Flash Next on DGX Spark / GB10.
+# Qwen3.8 Flash Next on DGX Spark / GB10, vLLM 0.32.0.
 # Build from the repository root with scripts/build.sh. It fetches the blazux overlay at the pinned commit and passes it
 # to docker as the named build context "blazux":
-#   scripts/build.sh qwen3.8-flash-next
+#   VLLM=0.32 scripts/build.sh qwen3.8-flash-next
 #
 # Layers, in order:
-#   1. vLLM v0.31.0 (official image, pinned by digest)
-#   2. Qwen3.8 Flash Next overlay (blazux/qwen3.8-Flash-DGX @ 5108d90, steps 1-18) + two files rebased for v0.31
+#   1. vLLM v0.32.0 (official image, pinned by digest)
+#   2. Qwen3.8 Flash Next overlay (blazux/qwen3.8-Flash-DGX @ 5108d90, steps 1-18): as on 0.31, with steps 1 and 4
+#      adapted to 0.32 (overlay/*_v032.py); 12+13 and 14 apply as they are
 #   3. think-eos-guard
 #   4. YaRN/mRoPE correction range (vLLM PR #58879)
 #   5. GB10 decode layer (FP8 LM head, fused shared-expert gate, GB10 router tier, FP8/FP4 weight-only linears)
-#   6. serve.py + profiles.json (entrypoint)
+#   6. CuTeDSL warm-up fix (gb10/cutedsl-warmup)
+#   7. MTP draft gets the target's YaRN rope (gb10/mtp-draft-rope; without it contexts above 256K crash, vllm#62383)
+#   8. serve.py + profiles.json (entrypoint)
 # Every patch step fails the build if its anchor or hunk does not match.
-FROM vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+FROM vllm/vllm-openai:v0.32.0@sha256:6ff5ff0ddf3658d2c2d677dac5ca2d4726ce0156b4371166d918181b210bd4bc
 ARG SP=/usr/local/lib/python3.12/dist-packages
 ARG PKG=${SP}/vllm/models/qwen4_exp/nvidia
 ARG PLE=${PKG}/ngram_embedding.py
@@ -20,6 +23,8 @@ ENV MAX_JOBS=2 FLASHINFER_NVCC_THREADS=1
 # ---- 2. Qwen3.8 Flash Next overlay (blazux) ----
 # 1. PLE n-gram table served from disk (VLLM_PLE_MMAP=1)
 COPY --from=blazux src/vllm_ple_mmap.py ${SP}/vllm_ple_mmap.py
+COPY models/qwen3.8-flash-next/overlay/patch_ple_mmap_v032.py /tmp/
+RUN python3 /tmp/patch_ple_mmap_v032.py ${SP}/vllm_ple_mmap.py && rm /tmp/patch_ple_mmap_v032.py
 RUN cp ${PLE} ${PLE}.orig \
  && printf '\n\n# --- serve the PLE n-gram table from disk (VLLM_PLE_MMAP=1) ---\nfrom vllm_ple_mmap import apply as _ple_mmap_apply\n_ple_mmap_apply(Qwen4ExpNGramEmbedding)\n' >> ${PLE} \
  && python3 -c "import ast; ast.parse(open('${PLE}').read())"
@@ -28,9 +33,9 @@ ARG FLA_UTILS=${SP}/vllm/third_party/flash_linear_attention/ops/utils.py
 ARG FLA_CDH=${SP}/vllm/third_party/flash_linear_attention/ops/chunk_delta_h.py
 RUN sed -i 's|DEFAULT = 102400|DEFAULT = 101376  # GB10: 99 KiB shared memory|' ${FLA_UTILS} && grep -q "GB10: 99 KiB" ${FLA_UTILS} \
  && sed -i 's|for num_warps in \[2, 4\]|for num_warps in [2]  # GB10: fla#953|' ${FLA_CDH} && grep -q "fla#953" ${FLA_CDH}
-# 4. prefix caching: mamba block size
-COPY --from=blazux src/patch_mamba_block_size.py /tmp/
-RUN python3 /tmp/patch_mamba_block_size.py ${SP} && rm /tmp/patch_mamba_block_size.py
+# 4. prefix caching: mamba block size (on 0.32 only the scheduler half; the worker half is upstream, #55601)
+COPY models/qwen3.8-flash-next/overlay/patch_mamba_block_size_v032.py /tmp/
+RUN python3 /tmp/patch_mamba_block_size_v032.py ${SP} && rm /tmp/patch_mamba_block_size_v032.py
 # 5. exact QSA top-k fallback (VLLM_QSA_EXACT_TOPK=1)
 COPY --from=blazux src/patch_qsa_exact_topk.py /tmp/
 RUN python3 /tmp/patch_qsa_exact_topk.py ${PKG}/ops/qsa_indexer.py && rm /tmp/patch_qsa_exact_topk.py
@@ -62,10 +67,10 @@ RUN cd /opt/llm/kernel-det/src && DET_BUILD_DIR=/opt/llm/kernel-det/build DET_AR
 COPY --from=blazux src/patch_mtp_draft_vocab.py /tmp/
 COPY --from=blazux src/draft_vocab_65536.npy /opt/llm/draft_vocab_65536.npy
 RUN python3 /tmp/patch_mtp_draft_vocab.py ${PKG}/mtp.py && rm /tmp/patch_mtp_draft_vocab.py
-# 12+13. Qwen tool preamble; quoted tool markers stay text (rebased for v0.31)
+# 12+13. Qwen tool preamble; quoted tool markers stay text (the v0.31 rebase applies unchanged)
 COPY models/qwen3.8-flash-next/overlay/patches/qwen-tool-12-13-v031.diff /tmp/qwen-tool-12-13.diff
 RUN cd ${SP} && patch --batch --forward --fuzz=0 -p1 < /tmp/qwen-tool-12-13.diff && rm /tmp/qwen-tool-12-13.diff
-# 14. MoE weight loading: clone the mmap view before the host-to-device copy (rebased for v0.31; VLLM_LOAD_CLONE=0 disables)
+# 14. MoE weight loading: clone the mmap view before the host-to-device copy (the v0.31 rebase applies unchanged; VLLM_LOAD_CLONE=0 disables)
 COPY models/qwen3.8-flash-next/overlay/patch_moe_load_clone_v031.py /tmp/patch_moe_load_clone.py
 RUN python3 /tmp/patch_moe_load_clone.py ${SP} && rm /tmp/patch_moe_load_clone.py
 # 15, 17, 18. weight loading: pread small tensors, chunked embedding copy, MTP name prefilter
@@ -74,14 +79,14 @@ RUN python3 /tmp/patch_load_pread.py ${SP} && python3 /tmp/patch_embed_chunked_c
  && rm /tmp/patch_load_pread.py /tmp/patch_embed_chunked_copy.py /tmp/patch_mtp_name_prefilter.py
 
 # ---- 3. think-eos-guard ----
-COPY gb10/think-eos-guard/serving_think_guard.diff /tmp/serving_think_guard.diff
+COPY gb10/think-eos-guard/serving_think_guard-v032.diff /tmp/serving_think_guard.diff
 COPY gb10/think-eos-guard/think_guard.py ${SP}/vllm/entrypoints/openai/chat_completion/think_guard.py
 RUN cd ${SP} && patch -p1 --forward --no-backup-if-mismatch < /tmp/serving_think_guard.diff && rm -f /tmp/serving_think_guard.diff \
  && rm -f vllm/entrypoints/openai/chat_completion/__pycache__/serving.*.pyc \
  && grep -q "wrap_generate" vllm/entrypoints/openai/chat_completion/serving.py
 
 # ---- 4. YaRN / mRoPE correction range (vLLM PR #58879) ----
-COPY gb10/yarn-mrope-58879/yarn_mrope_58879.diff /tmp/yarn.diff
+COPY gb10/yarn-mrope-58879/yarn_mrope_58879-v032.diff /tmp/yarn.diff
 COPY gb10/yarn-mrope-58879/test_yarn_mrope.py /opt/vllm-dgx-spark/test_yarn_mrope.py
 RUN cd ${SP} && patch -p1 --forward --no-backup-if-mismatch < /tmp/yarn.diff && rm -f /tmp/yarn.diff \
  && rm -f vllm/model_executor/layers/rotary_embedding/__pycache__/mrope.*.pyc vllm/model_executor/layers/rotary_embedding/__pycache__/yarn_scaling_rope.*.pyc \
@@ -93,13 +98,24 @@ RUN python3 /opt/vllm-dgx-spark/gb10/apply_gb10.py ${SP}/vllm \
  && find ${SP}/vllm -name "*.pyc" \( -path "*logits_processor*" -o -path "*qwen2_moe*" -o -path "*gate_linear*" -o -path "*qwen4_exp*" \) -delete \
  && find ${SP}/vllm/model_executor/layers -maxdepth 2 -name "linear.*.pyc" -delete
 
-# ---- 6. entrypoint ----
+# ---- 6. CuTeDSL warm-up fix (VLLM_GB10_WARMUP_FIX=0 restores the stock warm-up) ----
+COPY gb10/cutedsl-warmup/apply_warmup.py /opt/vllm-dgx-spark/warmup/
+RUN python3 /opt/vllm-dgx-spark/warmup/apply_warmup.py ${SP}/vllm \
+ && find ${SP}/vllm -name "skinny_gemm.*.pyc" -delete \
+ && find ${SP}/vllm -name "low_latency_gemm.*.pyc" -path "*qwen4_exp*" -delete
+
+# ---- 7. MTP draft gets the target's YaRN rope (vllm#62383) ----
+COPY gb10/mtp-draft-rope/apply_mtp_rope.py /opt/vllm-dgx-spark/mtp-rope/
+RUN python3 /opt/vllm-dgx-spark/mtp-rope/apply_mtp_rope.py ${SP}/vllm \
+ && find ${SP}/vllm/config -name "speculative.*.pyc" -delete
+
+# ---- 8. entrypoint ----
 COPY models/qwen3.8-flash-next/serve.py models/qwen3.8-flash-next/profiles.json /opt/vllm-dgx-spark/
-LABEL org.opencontainers.image.title="vllm-dgx-spark-gb10: Qwen3.8 Flash Next" \
+LABEL org.opencontainers.image.title="vllm-dgx-spark-gb10: Qwen3.8 Flash Next (vLLM 0.32)" \
       org.opencontainers.image.source="https://github.com/Monolith-ApS/vllm-dgx-spark-gb10" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.vendor="Monolith ApS (https://www.monolith.dk/en)" \
       org.opencontainers.image.authors="Carsten Berggreen (https://berggreens.dk/en/)" \
-      org.opencontainers.image.base.name="vllm/vllm-openai:v0.31.0"
+      org.opencontainers.image.base.name="vllm/vllm-openai:v0.32.0"
 EXPOSE 8000
 ENTRYPOINT ["python3", "/opt/vllm-dgx-spark/serve.py"]

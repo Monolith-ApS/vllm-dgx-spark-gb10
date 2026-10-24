@@ -4,14 +4,17 @@
 # Creates the data directories, gives them to the user who runs the containers, and checks docker, the NVIDIA runtime
 # and free disk space. Safe to run again.
 #
-#   sudo scripts/setup-host.sh            # DATA_DIR=/data, owner = the user who called sudo
-#   sudo DATA_DIR=/srv/llm scripts/setup-host.sh
+#   sudo scripts/setup-host.sh [model]    # DATA_DIR=/data, owner = the user who called sudo
+#   sudo DATA_DIR=/srv/llm scripts/setup-host.sh [model]
+#
+# The model (a folder under models/) only sets how much free disk is needed; without it a default of 150 GB is checked.
 #
 # Layout:
-#   $DATA_DIR/models/<model>          model weights (mounted read-only at /models)
-#   $DATA_DIR/cache/vllm              vLLM compile cache (mounted at /root/.cache/vllm)
-#   $DATA_DIR/cache/flashinfer        FlashInfer JIT cache (mounted at /root/.cache/flashinfer)
+#   $DATA_DIR/models/<weights folder>       model weights (mounted read-only at /models/<weights folder>)
+#   $DATA_DIR/cache/<model>-vllm<release>   compile caches of one image (scripts/run.sh creates and mounts them)
 set -euo pipefail
+. "$(dirname "$0")/lib.sh"
+if [ -n "${1:-}" ] || [ "$(models_available | grep -c .)" -eq 1 ]; then select_model "${1:-}"; fi
 
 DATA_DIR="${DATA_DIR:-/data}"
 OWNER_USER="${OWNER_USER:-${SUDO_USER:-$(id -un)}}"
@@ -22,10 +25,10 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-mkdir -p "$DATA_DIR/models" "$DATA_DIR/cache/vllm" "$DATA_DIR/cache/flashinfer"
-chown "$OWNER_USER":"$(id -gn "$OWNER_USER")" "$DATA_DIR/models" "$DATA_DIR/cache" "$DATA_DIR/cache/vllm" "$DATA_DIR/cache/flashinfer"
+mkdir -p "$DATA_DIR/models" "$DATA_DIR/cache"
+chown "$OWNER_USER":"$(id -gn "$OWNER_USER")" "$DATA_DIR/models" "$DATA_DIR/cache"
 chmod 755 "$DATA_DIR/models"
-chmod 775 "$DATA_DIR/cache" "$DATA_DIR/cache/vllm" "$DATA_DIR/cache/flashinfer"
+chmod 775 "$DATA_DIR/cache"
 echo "OK   directories under $DATA_DIR, owner $OWNER_USER"
 
 if ! command -v docker >/dev/null; then
@@ -41,8 +44,8 @@ if ! id -nG "$OWNER_USER" | grep -qw docker; then
 fi
 free_gb=$(df -BG --output=avail "$DATA_DIR" | tail -1 | tr -dc '0-9')
 if [ "$free_gb" -lt "$NEED_GB" ]; then
-  echo "WARN $DATA_DIR has ${free_gb} GB free; Qwen3.8 Flash Next needs ~${NEED_GB} GB (weights ~133 GB + caches)" >&2
+  echo "WARN $DATA_DIR has ${free_gb} GB free; ${DISPLAY_NAME:-a model} needs ~${NEED_GB} GB (weights${WEIGHTS_GB:+ ~$WEIGHTS_GB GB} + caches)" >&2
 else
   echo "OK   ${free_gb} GB free in $DATA_DIR"
 fi
-echo "next: scripts/get-model.sh"
+echo "next: scripts/get-model.sh ${MODEL:-<model>}"

@@ -1,67 +1,41 @@
 # Configuration
 
+What can be set when starting a model, the same for every model. Each model's own settings (its profiles, thinking mode,
+sampling defaults) are in its folder: [models/qwen3.8-flash-next/configuration.md](../models/qwen3.8-flash-next/configuration.md).
+
 ## Profiles
 
-`PROFILE` selects context window and concurrency. Concurrency = conversations that can be at the full context window at the
-same time without losing their KV/prefix cache. Profiles are defined in `models/qwen3.8-flash-next/profiles.json`.
+A model comes with ready-made profiles: a context window (how much text one conversation can hold) combined with the number of
+conversations that can use the full window at the same time. `PROFILE` selects one; `PROFILE=list scripts/run.sh <model>`
+prints the model's profiles, and the model's README says which to choose.
 
-| Profile | Context (tokens) | Concurrency | gpu_memory_utilization | Mamba cache mode | Fill test |
-|---|---|---|---|---|---|
-| `128k-c8` | 131,072 | 8 | 0.89 | all | passed |
-| `256k-c5` | 262,144 | 5 | 0.90 | all | passed |
-| `384k-c4` | 393,216 | 4 | 0.90 | all | passed |
-| `480k-c3` | 491,520 | 3 | 0.89 | all | passed |
-| `512k-c3` (default) | 524,288 | 3 | 0.89 | all | passed |
-| `640k-c2` | 655,360 | 2 | 0.89 | all | passed |
-| `768k-c2` | 786,432 | 2 | 0.89 | all | passed |
-| `1024k-c1` | 1,048,576 | 1 | 0.88 | all | passed |
-
-Every profile also exists as `<name>-think` (thinking on by default, same memory use).
-
-Fill test: [measurements.md](measurements.md#capacity). Above 262,144 tokens the profile adds YaRN rope scaling
-(`factor = context / 262144`) automatically.
+```bash
+PROFILE=256k-c5 scripts/run.sh qwen3.8-flash-next
+```
 
 ## Environment variables
 
-For `scripts/run.sh` and the container:
+For the scripts, set before the command (`PORT=8001 scripts/run.sh`):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROFILE` | `512k-c3` | see the table; `list` prints the profiles |
-| `THINKING` | `0` | default `enable_thinking` for requests that do not set it |
-| `SERVED_NAME` | `qwen3.8-flash-next` | model name in the API |
+| `PROFILE` | the model's default | see above |
+| `VLLM` | the model's default | vLLM release, when the model offers more than one ([vllm-versions.md](vllm-versions.md)); use the same for build and run |
+| `THINKING` | `0` | `1`: the model thinks by default for requests that do not say otherwise (models that support it) |
 | `PORT` | `8000` | host port |
-| `API_KEY` | none | when set, clients must send it as Bearer token |
-| `GMU` | profile value | override gpu_memory_utilization |
-| `MTP` | `7`, with thinking `3` | speculative (MTP) draft tokens per step |
-| `DRY_RUN` | `0` | `1` prints the vLLM command line instead of starting |
+| `API_KEY` | none | when set, clients must send it as Bearer token ([how](security.md)) |
+| `SERVED_NAME` | the model's name | model name in the API |
+| `DRY_RUN` | `0` | `1` prints the server command line the container would run and starts nothing |
+| `DATA_DIR` | `/data` | root of models and caches on the host ([layout](installation.md#directory-layout-on-the-host)) |
+| `MODEL_DIR` | `$DATA_DIR/models/<weights folder>` | use model weights that are somewhere else |
+| `NAME` | `vllm-gb10` | container name; one model runs at a time, starting another replaces it |
+| `IMAGE` | `vllm-dgx-spark-gb10:<model>-vllm<release>` | the image to run |
+| `CACHE_DIR` | `$DATA_DIR/cache/<model>-vllm<release>` | compile caches of this image |
 
-`scripts/run.sh` also reads `DATA_DIR`, `MODEL_DIR`, `IMAGE` and `NAME` (container name, default `qwen38-flash-next`).
+A model can accept more variables of its own (for example memory settings); they are in its configuration page, and
+`scripts/run.sh` passes them on to the container when they are set.
 
-Arguments after the image name in `docker run` are appended to the vLLM command line.
+## Adding a model or a vLLM release
 
-## Thinking mode
-
-Per request:
-
-```json
-{"model": "qwen3.8-flash-next", "messages": [...], "chat_template_kwargs": {"enable_thinking": true}}
-```
-
-Server-wide default sampling, chosen by `THINKING` at start; a request can override each value:
-
-| `THINKING` | temperature | top_p | top_k | min_p | presence_penalty |
-|---|---|---|---|---|---|
-| `0` | 1.0 | 0.95 | 20 | 0.0 | - |
-| `1` | 0.8 | 0.95 | 20 | 0.0 | 1.0 |
-
-With thinking on by default (`-think` or `THINKING=1`) the server uses 3 MTP draft tokens instead of 7: reasoning text
-accepts fewer draft tokens, so the shorter draft decodes faster ([measurements.md](measurements.md#thinking-on-vs-off)).
-Requests that turn thinking on against a non-thinking profile run with 7.
-
-Reasoning text is returned in `reasoning` (streaming: `delta.reasoning`), separate from `content`. Speed and results with thinking on vs off:
-[measurements.md](measurements.md#thinking-on-vs-off).
-
-## Tool calling
-
-Enabled (`--enable-auto-tool-choice`, parser `qwen3_coder`). Send `tools` in the OpenAI format.
+A model is a folder under `models/`, a vLLM release one more Dockerfile in it; nothing needs to change in the scripts. How:
+[image.md](image.md#adding-a-model).

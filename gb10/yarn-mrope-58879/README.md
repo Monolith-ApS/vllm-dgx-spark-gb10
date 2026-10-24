@@ -5,7 +5,8 @@ correction range is computed from that value: (16, 24) instead of (14, 22) for Q
 frequencies differ from the Hugging Face formula (by up to 25 % at factor 2 / 512K, 50 % at 3, 75 % at 4). It affects every
 request on a context above the native 262,144 tokens. 256K and below run without YaRN and are not affected.
 
-Files: `yarn_mrope_58879.diff` (the two source hunks of the PR), `yarn_math.py` (the math), `test_yarn_mrope.py`
+Files: `yarn_mrope_58879-v031.diff` and `-v032.diff` (the two source hunks of the PR, one per vLLM release; neither release
+contains the PR), `yarn_math.py` (the math), `test_yarn_mrope.py`
 (compares vLLM's cos/sin cache with transformers' YaRN for factors 2/3/4 on CPU; expect `MATCH` in a patched image):
 
     docker run --rm --gpus all --memory 8g --entrypoint python3 <image> /opt/vllm-dgx-spark/test_yarn_mrope.py

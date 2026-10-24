@@ -1,0 +1,34 @@
+Source hunks of vllm-project/vllm PR #58879 ("mRoPE YaRN correction range", fixes #58870), without its test file, rebased onto vLLM v0.32.0 (the mrope.py context moved; the change is the same).
+diff --git a/vllm/model_executor/layers/rotary_embedding/mrope.py b/vllm/model_executor/layers/rotary_embedding/mrope.py
+index 9bcc5a95e1..3273d1de24 100644
+--- a/vllm/model_executor/layers/rotary_embedding/mrope.py
++++ b/vllm/model_executor/layers/rotary_embedding/mrope.py
+@@ -344,6 +344,7 @@ class MRotaryEmbedding(RotaryEmbeddingBase):
+         else:
+             self.mscale = 1.0
+ 
++        self.original_max_position_embeddings = max_position_embeddings
+         # In Qwen2.5-VL, the maximum index value is related to the duration of
+         # the input video. We enlarge max_position_embeddings to 4 times to get
+         # a larger the cos and sin cache. Models whose positions never exceed
+diff --git a/vllm/model_executor/layers/rotary_embedding/yarn_scaling_rope.py b/vllm/model_executor/layers/rotary_embedding/yarn_scaling_rope.py
+index 01fbf0b2c5..e3030c0dd0 100644
+--- a/vllm/model_executor/layers/rotary_embedding/yarn_scaling_rope.py
++++ b/vllm/model_executor/layers/rotary_embedding/yarn_scaling_rope.py
+@@ -34,6 +34,7 @@ class YaRNScalingRotaryEmbedding(RotaryEmbedding):
+         self.beta_fast = beta_fast
+         self.beta_slow = beta_slow
+         self.truncate = truncate
++        self.original_max_position_embeddings = max_position_embeddings
+         # Get n-d magnitude scaling corrected for interpolation
+         if attention_factor is not None:
+             self.mscale = float(attention_factor)
+@@ -60,7 +61,7 @@ class YaRNScalingRotaryEmbedding(RotaryEmbedding):
+             self.beta_slow,
+             self.rotary_dim,
+             self.base,
+-            self.max_position_embeddings,
++            self.original_max_position_embeddings,
+             self.truncate,
+         )
+         # Get n-d rotational scaling corrected for extrapolation

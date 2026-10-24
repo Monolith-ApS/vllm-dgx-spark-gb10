@@ -5,15 +5,16 @@ Maintainer: Carsten Berggreen (https://berggreens.dk/en/)
 Licensed under the Apache License, Version 2.0 (LICENSE).
 
 This repository builds on the following projects. Their sources are fetched at build time at the pinned versions listed in
-docs/building.md; files carried here that derive from them keep their original license.
+each model's pins.md (models/<model>/pins.md); files carried here that derive from them keep their original license.
 
 vLLM - https://github.com/vllm-project/vllm
-  Apache License 2.0. Base image vllm/vllm-openai:v0.31.0. gb10/yarn-mrope-58879/yarn_mrope_58879.diff is the source change
-  of vLLM pull request #58879.
+  Apache License 2.0. Base images of models/qwen3.8-flash-next: vllm/vllm-openai:v0.31.0 and v0.32.0. The diffs in
+  gb10/yarn-mrope-58879/ are the source change of vLLM pull request #58879, for each release.
 
 qwen3.8-Flash-DGX (blazux) - https://github.com/blazux/qwen3.8-Flash-DGX
   Apache License 2.0, Copyright 2026 blazux. The Qwen3.8 Flash Next overlay (steps 1-18 in
-  models/qwen3.8-flash-next/Dockerfile). models/qwen3.8-flash-next/overlay/ contains two of its files rebased for vLLM v0.31.
+  models/qwen3.8-flash-next/Dockerfile.vllm-*). models/qwen3.8-flash-next/overlay/ contains two of its files rebased for
+  vLLM v0.31 and two scripts that adapt steps 1 and 4 to vLLM v0.32.
   The GB10 FLA fixes in that overlay are credited there to Saren-Arterius; the MoE weight-load clone to Willian-Zhang.
 
 qwen38-flash-next-gb10 (jschmied) - https://github.com/jschmied/qwen38-flash-next-gb10

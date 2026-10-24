@@ -1,6 +1,6 @@
 # think-eos-guard
 
-Server-side fix for two reasoning-channel failures of Qwen3.8 (vLLM 0.30/0.31, `qwen3` reasoning parser):
+Server-side fix for two reasoning-channel failures of Qwen3.8 (vLLM 0.30 to 0.32, `qwen3` reasoning parser):
 
 1. The model samples EOS (`<|im_end|>`) inside an unfinished reasoning block. vLLM returns `finish_reason=stop` with the whole
    output in `reasoning_content`, empty `content` and no tool call. The guard resumes the generation from prompt + generated
@@ -10,7 +10,8 @@ Server-side fix for two reasoning-channel failures of Qwen3.8 (vLLM 0.30/0.31, `
 
 Sampling is not changed, so MTP speculative decoding keeps working. Related upstream: vLLM #55420.
 
-Files: `think_guard.py` (module), `serving_think_guard.diff` (wraps `engine_client.generate` in `OpenAIServingChat`),
+Files: `think_guard.py` (module, the same for every release), `serving_think_guard-v031.diff` and `-v032.diff` (wrap
+`engine_client.generate` in `OpenAIServingChat`, one per vLLM release),
 `test_think_guard.py` (offline tests: `python test_think_guard.py`).
 
 | Variable | Default | Meaning |

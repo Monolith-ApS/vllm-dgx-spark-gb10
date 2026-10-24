@@ -227,6 +227,24 @@ if "\nimport os\n" not in s:
 assert "_gb10_fp8_weight_wanted(layer) -> bool" in s and "\nimport os\n" in s
 open(p, "w", encoding="utf-8").write(s)
 
+# vLLM 0.32 (#59753): Qwen4Exp swaps UnquantizedLinearMethod for Qwen4ExpLowLatencyLinearMethod (SM121 bf16 skinny-GEMM
+# plans) on layers with a plan, and its apply calls the bf16 GEMM directly. A layer this patch already turned into FP8/FP4
+# rows goes back to UnquantizedLinearMethod.apply (the gb10 branch above); bf16 layers keep the skinny GEMM.
+rel = "models/qwen4_exp/nvidia/low_latency_gemm.py"
+if os.path.exists(os.path.join(pkg, rel)):
+    patch(rel, [(
+        """        if bias is None and not envs.VLLM_BATCH_INVARIANT:
+            return torch.ops.vllm.qwen4_exp_low_latency_gemm(x, layer.weight)
+""",
+        """        if (
+            bias is None
+            and not envs.VLLM_BATCH_INVARIANT
+            and getattr(layer, "gb10_w_scale", None) is None
+            and getattr(layer, "gb10_fp4_scales", None) is None
+        ):
+            return torch.ops.vllm.qwen4_exp_low_latency_gemm(x, layer.weight)
+""")])
+
 # qwen38-flash-dgx only: the MTP reduced draft vocabulary head (65536 x 2560 bf16 = 335 MB read per draft step).
 rel = "models/qwen4_exp/nvidia/mtp.py"
 if os.path.exists(os.path.join(pkg, rel)):
@@ -262,9 +280,33 @@ if os.path.exists(os.path.join(pkg, rel)):
 # the same). With it, FP8 KV can keep the MTP layer's cache (layer 48) in bf16: FP8 MTP-layer KV cost ~20 % decode through
 # lower draft acceptance (76 -> 57 % on Flash Next). Plus opt-in K/V magnitude stats and per-tensor FP8 KV scales
 # (VLLM_QSA_KV_STATS / VLLM_QSA_KV_SCALE): the checkpoint ships no k/v scales, so e4m3 KV runs at scale 1.0.
+# vLLM 0.32 has #60023 (qsa_kv_cache_dtype honours the skip list) and a fused K/V prepare inside the indexer launch: there
+# only the layer id and the hook on the unfused path are added (the opt-in stats/scales do not run on the fused path).
 rel = "models/qwen4_exp/nvidia/qsa.py"
-if os.path.exists(os.path.join(pkg, rel)):
-    patch(rel, [(
+_qsa = os.path.join(pkg, rel)
+_qsa_v032 = os.path.exists(_qsa) and "qsa_kv_cache_dtype(cache_config, prefix)" in open(_qsa, encoding="utf-8").read()
+if _qsa_v032:
+    _qsa_dtype = (
+        """        self.kv_cache_dtype = qsa_kv_cache_dtype(cache_config, prefix)
+""",
+        """        self.kv_cache_dtype = qsa_kv_cache_dtype(cache_config, prefix)
+        self._gb10_layer_id = extract_layer_index(prefix)
+""")
+    _qsa_update = (
+        """        impl = cast(Qwen4ExpQSAFlashAttentionImpl, self.impl)
+        if main_outputs is None:
+            assert key is not None and value is not None
+            impl.do_kv_cache_update(
+""",
+        """        impl = cast(Qwen4ExpQSAFlashAttentionImpl, self.impl)
+        if main_outputs is None:
+            assert key is not None and value is not None
+            if _GB10_KV_STATS or _GB10_KV_SCALE:
+                _gb10_kv_hook(self, key, value, num_tokens)
+            impl.do_kv_cache_update(
+""")
+else:
+    _qsa_dtype = (
         """        self.kv_cache_dtype = cache_config.cache_dtype
         self.kv_cache_torch_dtype = kv_cache_dtype_str_to_dtype(""",
         """        self.kv_cache_dtype = cache_config.cache_dtype
@@ -272,7 +314,18 @@ if os.path.exists(os.path.join(pkg, rel)):
         if _skip and str(layer_id) in [str(x) for x in _skip]:
             self.kv_cache_dtype = "auto"  # listed layer: bf16 cache (--kv-cache-dtype-skip-layers)
         self._gb10_layer_id = layer_id
-        self.kv_cache_torch_dtype = kv_cache_dtype_str_to_dtype("""), (
+        self.kv_cache_torch_dtype = kv_cache_dtype_str_to_dtype(""")
+    _qsa_update = (
+        """        impl = cast(Qwen4ExpQSAFlashAttentionImpl, self.impl)
+        impl.do_kv_cache_update(
+""",
+        """        impl = cast(Qwen4ExpQSAFlashAttentionImpl, self.impl)
+        if _GB10_KV_STATS or _GB10_KV_SCALE:
+            _gb10_kv_hook(self, key, value, num_tokens)
+        impl.do_kv_cache_update(
+""")
+if os.path.exists(_qsa):
+    patch(rel, [_qsa_dtype, (
         """class Qwen4ExpQSAAttention(Qwen3NextAttention, AttentionLayerBase):
 """,
         """_GB10_KV_STATS = __import__("os").environ.get("VLLM_QSA_KV_STATS", "0") == "1"
@@ -316,12 +369,4 @@ def _gb10_kv_hook(layer, key, value, num_tokens):
 
 
 class Qwen4ExpQSAAttention(Qwen3NextAttention, AttentionLayerBase):
-"""), (
-        """        impl = cast(Qwen4ExpQSAFlashAttentionImpl, self.impl)
-        impl.do_kv_cache_update(
-""",
-        """        impl = cast(Qwen4ExpQSAFlashAttentionImpl, self.impl)
-        if _GB10_KV_STATS or _GB10_KV_SCALE:
-            _gb10_kv_hook(self, key, value, num_tokens)
-        impl.do_kv_cache_update(
-""")])
+"""), _qsa_update])

@@ -1,28 +1,32 @@
-# docker compose alternative to scripts/run.sh
+# docker compose alternative to scripts/run.sh. The model's settings come from its model.env:
 #
-#   docker compose up -d                                   # 512k-c3, thinking off
-#   PROFILE=512k-c3-think docker compose up -d             # same, thinking on by default
-#   PROFILE=128k-c8 docker compose up -d
+#   docker compose --env-file models/qwen3.8-flash-next/model.env up -d                  # default profile and vLLM release
+#   VLLM=0.32 PROFILE=512k-c3-think docker compose --env-file models/qwen3.8-flash-next/model.env up -d
 #   docker compose logs -f
 #
-# Build the image first: scripts/build.sh qwen3.8-flash-next
+# Build the image first with the same VLLM: scripts/build.sh qwen3.8-flash-next (or VLLM=0.32 scripts/build.sh ...).
+# The cache directories must exist (mkdir -p /data/cache/<model>-vllm<release>/{vllm,flashinfer,humming}); scripts/run.sh
+# creates them.
 services:
-  qwen38-flash-next:
-    image: ${IMAGE:-vllm-dgx-spark-gb10:qwen3.8-flash-next}
-    container_name: ${NAME:-qwen38-flash-next}
+  model:
+    image: ${IMAGE:-vllm-dgx-spark-gb10:${MODEL_NAME}-vllm${VLLM:-${VLLM_DEFAULT}}}
+    container_name: ${NAME:-vllm-gb10}
     restart: unless-stopped
     ipc: host
     shm_size: 16g
     ports:
       - "${PORT:-8000}:8000"
     environment:
-      PROFILE: ${PROFILE:-512k-c3}
+      PROFILE: ${PROFILE:-${DEFAULT_PROFILE}}
       THINKING: ${THINKING:-0}
+      SERVED_NAME: ${SERVED_NAME}
+      MODEL: /models/${WEIGHTS_DIR}
       API_KEY: ${API_KEY:-}
     volumes:
-      - ${DATA_DIR:-/data}/models/Qwen3.8-Flash-Next-NVFP4:/models/Qwen3.8-Flash-Next-NVFP4:ro
-      - ${DATA_DIR:-/data}/cache/vllm:/root/.cache/vllm
-      - ${DATA_DIR:-/data}/cache/flashinfer:/root/.cache/flashinfer
+      - ${DATA_DIR:-/data}/models/${WEIGHTS_DIR}:/models/${WEIGHTS_DIR}:ro
+      - ${DATA_DIR:-/data}/cache/${MODEL_NAME}-vllm${VLLM:-${VLLM_DEFAULT}}/vllm:/root/.cache/vllm
+      - ${DATA_DIR:-/data}/cache/${MODEL_NAME}-vllm${VLLM:-${VLLM_DEFAULT}}/flashinfer:/root/.cache/flashinfer
+      - ${DATA_DIR:-/data}/cache/${MODEL_NAME}-vllm${VLLM:-${VLLM_DEFAULT}}/humming:/root/.humming
     deploy:
       resources:
         reservations:
