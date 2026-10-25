@@ -5,11 +5,11 @@
 An image is the official vLLM container with our patches on top. Build it on the DGX Spark itself:
 
 ```bash
-scripts/build.sh qwen3.8-flash-next                # vLLM 0.31.0, the default
-VLLM=0.32 scripts/build.sh qwen3.8-flash-next      # vLLM 0.32.0
+scripts/build.sh qwen3.8-flash-next                # vLLM 0.32.0, the default
+VLLM=0.31 scripts/build.sh qwen3.8-flash-next      # vLLM 0.31.0
 ```
 
-The first gives the image `vllm-dgx-spark-gb10:qwen3.8-flash-next-vllm0.31`, the second `...-vllm0.32`. Both can be on the
+The first gives the image `vllm-dgx-spark-gb10:qwen3.8-flash-next-vllm0.32`, the second `...-vllm0.31`. Both can be on the
 machine at the same time; `scripts/run.sh` starts the one that matches `VLLM` (so use the same `VLLM` for build and run). A
 build takes about 20-30 minutes. What goes into the image: [architecture](../models/qwen3.8-flash-next/architecture.md#image-layers);
 the exact versions: [pins](../models/qwen3.8-flash-next/pins.md).
@@ -19,7 +19,22 @@ the exact versions: [pins](../models/qwen3.8-flash-next/pins.md).
 The two releases below are offered for Qwen3.8 Flash Next. The numbers are from all eight profiles on one DGX Spark; the full
 comparison is in [vLLM 0.31.0 or 0.32.0](../models/qwen3.8-flash-next/vllm-versions.md).
 
-### vLLM 0.31.0 (default)
+### vLLM 0.32.0 (default)
+
+Pros:
+- Measured and verified from this repository's own build: all profiles, fill tests, tool calling
+  ([numbers](../models/qwen3.8-flash-next/measurements.md)).
+- Starts about 7-9 s faster after a restart of the same profile.
+- 1-6 % more room for conversation memory (KV cache), and a little more free memory.
+- Newer vLLM release; the starting point for releases after it.
+
+Cons:
+- Decodes at the same speed as 0.31.0, not faster (97-103 % per profile).
+- Needs two fixes of our own: without them every context window above 256K crashes at ~265K tokens, and engine start-up
+  takes 50-57 s instead of 33-43 s ([why](vllm-versions.md#problems-we-found-in-vllm-0320); the fixes: [mtp-draft-rope](../gb10/mtp-draft-rope/README.md),
+  [cutedsl-warmup](../gb10/cutedsl-warmup/README.md)).
+
+### vLLM 0.31.0 (`VLLM=0.31`)
 
 Pros:
 - Measured and verified from this repository's own build: all profiles, fill tests, tool calling
@@ -28,22 +43,7 @@ Pros:
 
 Cons:
 - Starts about 7-9 s slower than 0.32.0 (about 127 s against 118 s until the server answers).
-- About 1-5 % less room for conversation memory (KV cache) than 0.32.0.
-
-### vLLM 0.32.0 (`VLLM=0.32`)
-
-Pros:
-- Starts about 7-9 s faster.
-- 1-5 % more room for conversation memory (KV cache).
-- Newer vLLM release; the starting point for releases after it.
-
-Cons:
-- Decodes at the same speed as 0.31.0, not faster (97-103 % per profile).
-- Needs two fixes of our own: without them every context window above 256K crashes at ~265K tokens, and engine start-up
-  takes 50-57 s instead of 33-43 s ([why](vllm-versions.md#problems-we-found-in-vllm-0320); the fixes: [mtp-draft-rope](../gb10/mtp-draft-rope/README.md),
-  [cutedsl-warmup](../gb10/cutedsl-warmup/README.md)).
-- The numbers come from an image with the same layers built outside this repository; the build from this repository has not
-  been through the full test yet.
+- About 1-6 % less room for conversation memory (KV cache) than 0.32.0.
 
 ## Repository layout
 

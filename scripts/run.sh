@@ -2,7 +2,7 @@
 # run.sh - start a model with a profile.
 #
 #   scripts/run.sh [model]                 # the model's default profile and vLLM release, port 8000
-#   VLLM=0.32 scripts/run.sh [model]       # the image built for another vLLM release (scripts/build.sh with the same VLLM)
+#   VLLM=0.31 scripts/run.sh [model]       # the image built for another vLLM release (scripts/build.sh with the same VLLM)
 #   PROFILE=256k-c5 scripts/run.sh [model]
 #   THINKING=1 scripts/run.sh [model]      # thinking on by default for requests that do not set it
 #   PROFILE=list scripts/run.sh [model]    # show the model's profiles

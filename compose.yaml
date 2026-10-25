@@ -1,10 +1,10 @@
 # docker compose alternative to scripts/run.sh. The model's settings come from its model.env:
 #
 #   docker compose --env-file models/qwen3.8-flash-next/model.env up -d                  # default profile and vLLM release
-#   VLLM=0.32 PROFILE=512k-c3-think docker compose --env-file models/qwen3.8-flash-next/model.env up -d
+#   VLLM=0.31 PROFILE=512k-c3-think docker compose --env-file models/qwen3.8-flash-next/model.env up -d
 #   docker compose logs -f
 #
-# Build the image first with the same VLLM: scripts/build.sh qwen3.8-flash-next (or VLLM=0.32 scripts/build.sh ...).
+# Build the image first with the same VLLM: scripts/build.sh qwen3.8-flash-next (or VLLM=0.31 scripts/build.sh ...).
 # The cache directories must exist (mkdir -p /data/cache/<model>-vllm<release>/{vllm,flashinfer,humming}); scripts/run.sh
 # creates them.
 services:

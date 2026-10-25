@@ -15,8 +15,8 @@ flowchart TB
     K["jschmied/qwen38-flash-next-gb10 @ e0ef69d<br/>deterministic top-k kernel sources<br/>(checksum-pinned, compiled in the build)"] -.-> B
 ```
 
-This is the image for vLLM 0.31 (`Dockerfile.vllm-0.31`, the default). The image for vLLM 0.32 (`Dockerfile.vllm-0.32`,
-`VLLM=0.32`) has the same layers on vLLM 0.32.0, with steps 1 and 4 of the overlay and the think-eos-guard and YaRN diffs
+This is the image for vLLM 0.31 (`Dockerfile.vllm-0.31`, `VLLM=0.31`). The image for vLLM 0.32 (`Dockerfile.vllm-0.32`, the
+default) has the same layers on vLLM 0.32.0, with steps 1 and 4 of the overlay and the think-eos-guard and YaRN diffs
 adapted to 0.32, and two more layers before the entrypoint: the CuTeDSL warm-up fix (`gb10/cutedsl-warmup`) and the MTP draft
 rope fix (`gb10/mtp-draft-rope`). On 0.32 the server uses the Humming MoE kernels instead of Marlin ([pins](pins.md),
 [vLLM 0.31 against 0.32](vllm-versions.md)).

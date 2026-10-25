@@ -78,7 +78,7 @@ def main():
     name = os.environ.get("PROFILE", "512k-c3")
     if name == "list":
         for k, p in profiles.items():
-            print("%-10s context %7d  concurrency %d  gmu %.2f  %s" % (k, p["context"], p["concurrency"], p["gpu_memory_utilization"], p.get("status", "")))
+            print("%-10s context %7d  concurrency %d  gmu %-5g  %s" % (k, p["context"], p["concurrency"], p["gpu_memory_utilization"], p.get("status", "")))
         return 0
     thinking = os.environ.get("THINKING", "0") == "1"
     if name.endswith("-think"):
@@ -87,7 +87,6 @@ def main():
         sys.exit("unknown PROFILE %r; choose one of: %s (each also as <name>-think)" % (name, ", ".join(profiles)))
     p = profiles[name]
     ctx, seqs = int(p["context"]), int(p["concurrency"])
-    gmu = float(os.environ.get("GMU") or p["gpu_memory_utilization"])
     model = os.environ.get("MODEL", "/models/Qwen3.8-Flash-Next-NVFP4")
     served = os.environ.get("SERVED_NAME", "qwen3.8-flash-next")
     if not os.path.isfile(os.path.join(model, "config.json")):
@@ -97,6 +96,8 @@ def main():
     if release not in RELEASE_SETTINGS:
         sys.exit("vLLM %s: this entrypoint knows %s" % (release, ", ".join(RELEASE_SETTINGS)))
     rs = RELEASE_SETTINGS[release]
+    # a profile may keep another value on an older release ("gpu_memory_utilization_by_release": {"0.31": 0.90})
+    gmu = float(os.environ.get("GMU") or p.get("gpu_memory_utilization_by_release", {}).get(release, p["gpu_memory_utilization"]))
     splitting_ops = []
     for op in SPLITTING_OPS:
         splitting_ops.append(op)
@@ -106,7 +107,7 @@ def main():
     # MTP draft depth: 7 without thinking, 3 with thinking (reasoning text accepts fewer draft tokens); MTP overrides both
     spec = {"method": "mtp", "num_speculative_tokens": int(os.environ.get("MTP") or (3 if thinking else 7))}
     argv = ["vllm", "serve", model, "--served-model-name", served, "--host", "0.0.0.0", "--port", os.environ.get("PORT", "8000"),
-            "--max-model-len", str(ctx), "--max-num-seqs", str(seqs), "--gpu-memory-utilization", "%.2f" % gmu,
+            "--max-model-len", str(ctx), "--max-num-seqs", str(seqs), "--gpu-memory-utilization", "%g" % gmu,
             "--max-num-batched-tokens", str(p.get("max_num_batched_tokens", 4096)),
             "--enable-prefix-caching", "--enable-chunked-prefill",
             "-cc.cudagraph_mode=PIECEWISE", "-cc.splitting_ops=" + compact(splitting_ops), "--no-enable-flashinfer-autotune",
@@ -136,7 +137,7 @@ def main():
         print(" ".join(argv))
         print(json.dumps({k: os.environ[k] for k in env}, indent=1))
         return 0
-    print("profile %s: context %d, concurrency %d, gmu %.2f, thinking %s, vLLM %s" % (name, ctx, seqs, gmu, "on" if thinking else "off", release), flush=True)
+    print("profile %s: context %d, concurrency %d, gmu %g, thinking %s, vLLM %s" % (name, ctx, seqs, gmu, "on" if thinking else "off", release), flush=True)
     os.execvp(argv[0], argv)
 
 

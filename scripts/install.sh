@@ -3,7 +3,7 @@
 #
 #   scripts/install.sh [model]                           # the model's default profile, port 8000
 #   PROFILE=1024k-c1-think scripts/install.sh [model]    # any profile of the model (PROFILE=list scripts/run.sh shows them)
-#   VLLM=0.32 scripts/install.sh [model]                 # another vLLM release the model supports (VLLM_RELEASES in model.env)
+#   VLLM=0.31 scripts/install.sh [model]                 # another vLLM release the model supports (VLLM_RELEASES in model.env)
 #
 # Runs setup-host (asks for the sudo password once), get-model, build and run, then waits until the API answers.
 # Every step skips work that is already done, so the script is safe to run again (for example after an interruption

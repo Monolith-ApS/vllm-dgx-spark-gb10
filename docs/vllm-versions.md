@@ -23,13 +23,14 @@ Each row is a vLLM release with the patches on top of it. The example is Qwen3.8
 
 | Combination | Contexts above 256K | Decode speed | Start-up (engine initialisation / ready after) | In this repository |
 |---|---|---|---|---|
-| 0.31.0 + GB10 layers | work | baseline | ~30 s / ~127 s | `VLLM=0.31` (default) |
+| 0.31.0 + GB10 layers | work | baseline | ~30 s / ~127 s | `VLLM=0.31` |
 | 0.32.0 + GB10 layers | crash at ~265K tokens | - | 50-57 s / - | not offered |
-| 0.32.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work | same as 0.31.0 (97-103 %) | 33-43 s / ~118 s | `VLLM=0.32` |
+| 0.32.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work | same as 0.31.0 (97-103 %) | 33-43 s / ~118 s | `VLLM=0.32` (default) |
 
-0.32.0 with both patches is 7-9 s faster to start and has a 1-5 % larger KV cache; it decodes at the same speed and needs
-two patches that 0.31.0 does not. The 0.32 row was measured with an image of the same layers built outside this repository;
-the build from `Dockerfile.vllm-0.32` here still has to go through the same test.
+0.32.0 with both patches is 7-9 s faster to start and has a 1-6 % larger KV cache; it decodes at the same speed and needs
+two patches that 0.31.0 does not. The 0.32 row was first measured with an image of the same layers built outside this
+repository; the build from `Dockerfile.vllm-0.32` here passed the same test on 2026-10-25 (all eight profiles of Qwen3.8 Flash
+Next, [numbers](../models/qwen3.8-flash-next/measurements.md)).
 
 ## Problems we found in vLLM 0.32.0
 

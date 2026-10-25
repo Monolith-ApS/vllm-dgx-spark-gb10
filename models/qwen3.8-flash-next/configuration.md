@@ -1,7 +1,7 @@
 # Qwen3.8 Flash Next: configuration
 
 How the scripts and environment variables work in general: [docs/configuration.md](../../docs/configuration.md). This page is what
-is specific to this model. The model runs on vLLM 0.31 (default) or 0.32 (`VLLM=0.32`, see [vllm-versions.md](vllm-versions.md));
+is specific to this model. The model runs on vLLM 0.32 (default) or 0.31 (`VLLM=0.31`, see [vllm-versions.md](vllm-versions.md));
 the profiles and variables below are the same on both.
 
 ## Profiles
@@ -13,7 +13,7 @@ same time without losing their KV/prefix cache. Profiles are defined in `profile
 |---|---|---|---|---|---|
 | `128k-c8` | 131,072 | 8 | 0.89 | all | passed |
 | `256k-c5` | 262,144 | 5 | 0.89 | all | passed |
-| `384k-c4` | 393,216 | 4 | 0.90 | all | passed |
+| `384k-c4` | 393,216 | 4 | 0.895 | all | passed |
 | `480k-c3` | 491,520 | 3 | 0.89 | all | passed |
 | `512k-c3` (default) | 524,288 | 3 | 0.89 | all | passed |
 | `640k-c2` | 655,360 | 2 | 0.89 | all | passed |

@@ -2,7 +2,7 @@
 # build.sh - build a model's image from this repository.
 #
 #   scripts/build.sh [model]                  # the model's default vLLM release -> vllm-dgx-spark-gb10:<model>-vllm<release>
-#   VLLM=0.32 scripts/build.sh [model]        # another release the model supports (VLLM_RELEASES in its model.env)
+#   VLLM=0.31 scripts/build.sh [model]        # another release the model supports (VLLM_RELEASES in its model.env)
 #   TAG=myregistry/vllm-dgx-spark-gb10:<model>-vllm0.31 scripts/build.sh <model>
 #
 # Build on the DGX Spark itself (aarch64 + the GB10 GPU architecture). The Dockerfile is

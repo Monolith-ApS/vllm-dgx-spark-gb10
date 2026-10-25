@@ -33,16 +33,17 @@ PROFILE=256k-c5 scripts/run.sh qwen3.8-flash-next
 
 | Profile | Context window | Conversations at full length | Speed, one request | Speed, all conversations at once (total) |
 |---|---|---|---|---|
-| `128k-c8` | 128K | 8 | 80 (75-84) tok/s | 234 (221-256) tok/s |
-| `256k-c5` | 256K | 5 | 79 (73-81) tok/s | 183 (175-200) tok/s |
-| `384k-c4` | 384K | 4 | 80 (77-83) tok/s | 170 (161-178) tok/s |
-| `480k-c3` | 480K | 3 | 80 (79-82) tok/s | 145 (139-151) tok/s |
-| `512k-c3` (default) | 512K | 3 | 80 (79-84) tok/s | 142 (128-152) tok/s |
-| `640k-c2` | 640K | 2 | 78 (73-82) tok/s | 114 (105-118) tok/s |
-| `768k-c2` | 768K | 2 | 80 (76-84) tok/s | 119 (114-126) tok/s |
-| `1024k-c1` | 1M | 1 | 78 (72-81) tok/s | - |
+| `128k-c8` | 128K | 8 | 80 (76-82) tok/s | 232 (219-253) tok/s |
+| `256k-c5` | 256K | 5 | 78 (76-80) tok/s | 177 (162-186) tok/s |
+| `384k-c4` | 384K | 4 | 77 (77-78) tok/s | 162 (159-165) tok/s |
+| `480k-c3` | 480K | 3 | 80 (76-84) tok/s | 141 (138-147) tok/s |
+| `512k-c3` (default) | 512K | 3 | 79 (77-81) tok/s | 146 (142-151) tok/s |
+| `640k-c2` | 640K | 2 | 78 (75-80) tok/s | 117 (114-120) tok/s |
+| `768k-c2` | 768K | 2 | 79 (78-82) tok/s | 121 (117-127) tok/s |
+| `1024k-c1` | 1M | 1 | 77 (72-80) tok/s | - |
 
-Speeds are tokens per second: mean (lowest-highest) over 4-6 runs. "All at once" is the total for all conversations together, so
+Speeds are tokens per second on vLLM 0.32.0 (the default): mean (lowest-highest) over 3 runs (`384k-c4`: 1 run). The numbers
+for vLLM 0.31.0 are in [measurements](measurements.md). "All at once" is the total for all conversations together, so
 each one gets roughly the total divided by the number of conversations (`128k-c8`: about 29 tok/s each).
 
 **Which one?**
@@ -65,7 +66,7 @@ Details per profile, and what the terms mean: [measurements](measurements.md).
 |---|---|
 | [configuration.md](configuration.md) | profile table with the memory settings, environment variables, thinking mode, tool calling |
 | [measurements.md](measurements.md) | decode speed, capacity, tool calling, thinking on vs off |
-| [vllm-versions.md](vllm-versions.md) | vLLM 0.31 (default) or 0.32 (`VLLM=0.32`): how to choose, and how they compare |
+| [vllm-versions.md](vllm-versions.md) | vLLM 0.32 (default) or 0.31 (`VLLM=0.31`): how to choose, and how they compare |
 | [architecture.md](architecture.md) | image layers and the precision of every model component (diagrams) |
 | [pins.md](pins.md) | the exact versions the image is built from |
 

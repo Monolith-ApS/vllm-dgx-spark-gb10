@@ -7,8 +7,8 @@ DGX OS ships docker and the toolkit.
 The scripts are the same for every model. They take the model's name as the first argument; with only one model in the
 repository the name can be left out. The examples use `qwen3.8-flash-next`.
 
-`VLLM=<release>` in front of any script picks the vLLM release, when the model offers more than one (Qwen3.8 Flash Next: `0.31`,
-the default, or `0.32`; see [its comparison](../models/qwen3.8-flash-next/vllm-versions.md)). Use the same `VLLM` for build
+`VLLM=<release>` in front of any script picks the vLLM release, when the model offers more than one (Qwen3.8 Flash Next: `0.32`,
+the default, or `0.31`; see [its comparison](../models/qwen3.8-flash-next/vllm-versions.md)). Use the same `VLLM` for build
 and run.
 
 ## One command
@@ -17,7 +17,7 @@ and run.
 git clone https://github.com/Monolith-ApS/vllm-dgx-spark-gb10.git
 cd vllm-dgx-spark-gb10
 scripts/install.sh qwen3.8-flash-next       # or: PROFILE=1024k-c1-think scripts/install.sh qwen3.8-flash-next
-                                            # or: VLLM=0.32 scripts/install.sh qwen3.8-flash-next
+                                            # or: VLLM=0.31 scripts/install.sh qwen3.8-flash-next
 ```
 
 `scripts/install.sh` does these steps in order and skips what is already done, so you can run it again at any time:
@@ -84,7 +84,7 @@ replaces it.
 | Logs | `docker logs -f vllm-gb10` |
 | Change profile | `PROFILE=256k-c5 scripts/run.sh qwen3.8-flash-next` |
 | Switch model | `scripts/run.sh <other-model>` (after `scripts/install.sh <other-model>` the first time) |
-| Switch vLLM release | `VLLM=0.32 scripts/run.sh qwen3.8-flash-next` (after `VLLM=0.32 scripts/build.sh qwen3.8-flash-next` the first time) |
+| Switch vLLM release | `VLLM=0.31 scripts/run.sh qwen3.8-flash-next` (after `VLLM=0.31 scripts/build.sh qwen3.8-flash-next` the first time) |
 | Stop | `docker rm -f vllm-gb10` |
 | Update | `git pull && scripts/build.sh qwen3.8-flash-next && scripts/run.sh qwen3.8-flash-next` (with the same `VLLM` if you use one) |
 
