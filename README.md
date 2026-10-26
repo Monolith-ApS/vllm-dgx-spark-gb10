@@ -1,6 +1,6 @@
 # vllm-dgx-spark-gb10
 
-A working, tested vLLM setup for the NVIDIA DGX Spark: unpack the Spark, clone this repository, run one script, and you
+A working, tested vLLM setup for the NVIDIA DGX Spark (128 GB): unpack the Spark, clone this repository, run one script, and you
 have an OpenAI-compatible API serving a current model with long context and several parallel conversations.
 
 The focus is vLLM: the most performance, quality and stability that vLLM can deliver on the GB10 chip for the models in this
@@ -22,8 +22,9 @@ own license.
 
 > [!NOTE]
 > **Hardware compatibility.** This repository is tested only on the **NVIDIA DGX Spark** (GB10, 128 GB, DGX OS).
+> The DGX Spark is also sold with 64 GB; the models and profiles here need the 128 GB version and do not fit in 64 GB.
 >
-> Other GB10 systems use the same chip and memory size and may work: ASUS Ascent GX10, Dell Pro Max with GB10, HP ZGX Nano,
+> Other GB10 systems with the same chip and 128 GB may work: ASUS Ascent GX10, Dell Pro Max with GB10, HP ZGX Nano,
 > Lenovo ThinkStation PGX, MSI EdgeXpert, Gigabyte AI TOP Atom, Acer Veriton GN100. They are **not tested**. OS image,
 > driver/CUDA version, memory available to the GPU and cooling/power limits can differ, which can change the memory headroom
 > of the profiles and the speeds.

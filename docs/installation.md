@@ -1,6 +1,6 @@
 # Installation
 
-Requirements: a DGX Spark (see the hardware note in the [README](../README.md)) with docker, the NVIDIA Container Toolkit and
+Requirements: a DGX Spark with 128 GB (see the hardware note in the [README](../README.md)) with docker, the NVIDIA Container Toolkit and
 enough free disk for the model: the model's README says how much (Qwen3.8 Flash Next: ~160 GB, model ~133 GB and image ~24 GB).
 DGX OS ships docker and the toolkit.
 
