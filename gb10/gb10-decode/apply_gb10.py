@@ -100,18 +100,27 @@ s = s.replace("\nimport torch\n", "\nimport os\n\nimport torch\n\n_GB10_SHARED_G
 assert "_GB10_SHARED_GATE = " in s
 open(p, "w", encoding="utf-8").write(s)
 
-patch("model_executor/layers/fused_moe/router/gate_linear.py", [(
-    '''        can_use_specialized_kernels = (
-            current_platform.is_cuda() and (is_hopper or is_blackwell) and not bias
-        )''',
-    '''        # GB10 / RTX Blackwell (family 120) has PDL and thread block clusters, so the cuteDSL ll_bf16 tier works
+# vLLM 0.33 added `and not batch_invariant` and split the condition over several lines; use the anchor of the release
+_GL = os.path.join(pkg, "model_executor/layers/fused_moe/router/gate_linear.py")
+_gl_src = open(_GL, encoding="utf-8").read()
+_GL_SM12X = '''        # GB10 / RTX Blackwell (family 120) has PDL and thread block clusters, so the cuteDSL ll_bf16 tier works
         is_sm12x = (
             os.environ.get("VLLM_GB10_ROUTER_LL", "1") == "1"
             and current_platform.is_device_capability_family(120)
         )
-        can_use_specialized_kernels = (
-            current_platform.is_cuda() and (is_hopper or is_blackwell or is_sm12x) and not bias
-        )''')])
+'''
+_GL_V032 = '''        can_use_specialized_kernels = (
+            current_platform.is_cuda() and (is_hopper or is_blackwell) and not bias
+        )'''
+_GL_V033 = '''        can_use_specialized_kernels = (
+            current_platform.is_cuda()
+            and (is_hopper or is_blackwell)
+            and not bias
+            and not batch_invariant
+        )'''
+_gl_old = _GL_V033 if _GL_V033 in _gl_src else _GL_V032
+patch("model_executor/layers/fused_moe/router/gate_linear.py",
+      [(_gl_old, _GL_SM12X + _gl_old.replace("(is_hopper or is_blackwell)", "(is_hopper or is_blackwell or is_sm12x)"))])
 p = os.path.join(pkg, "model_executor/layers/fused_moe/router/gate_linear.py")
 s = open(p, encoding="utf-8").read()
 if "\nimport os\n" not in s:

@@ -55,6 +55,10 @@ RELEASE_SETTINGS = {
     # takes its place), and the QSA K/V prepare is a separate op that must be a graph split point like the QSA op.
     "0.32": {"moe_backend": "humming", "mamba_cache_mode": {"all": "align"},
              "splitting_ops_after": {"vllm::qwen4_exp_ple_short_conv": "vllm::qwen4_exp_qsa_prepare_with_output"}},
+    # 0.33: --mamba-cache-mode is gone from the command line (the mode follows prefix caching), so a profile's mamba cache mode is
+    # not passed; Marlin MoE kernels (what 0.33 was measured with); the QSA prepare split point as on 0.32.
+    "0.33": {"moe_backend": "marlin", "mamba_cache_mode": None,
+             "splitting_ops_after": {"vllm::qwen4_exp_ple_short_conv": "vllm::qwen4_exp_qsa_prepare_with_output"}},
 }
 
 
@@ -116,7 +120,7 @@ def main():
             "--moe-backend", rs["moe_backend"], "--block-size", "1680", "--load-format", os.environ.get("LOAD_FORMAT", "instanttensor"),
             "--override-generation-config", compact(SAMPLING[thinking]),
             "--default-chat-template-kwargs", compact({"enable_thinking": thinking})]
-    if p.get("mamba_cache_mode"):
+    if p.get("mamba_cache_mode") and rs["mamba_cache_mode"] is not None:
         argv += ["--mamba-cache-mode", rs["mamba_cache_mode"].get(p["mamba_cache_mode"], p["mamba_cache_mode"])]
     env = dict(BASE_ENV)
     if ctx > NATIVE_CONTEXT:  # YaRN above the native context

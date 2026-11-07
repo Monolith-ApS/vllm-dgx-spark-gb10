@@ -18,8 +18,15 @@ FILL_SRC = os.environ.get("FILL_SRC", os.path.join(sysconfig.get_paths()["stdlib
 src = "".join(open(f, encoding="utf-8", errors="replace").read() for f in sorted(glob.glob(FILL_SRC)))
 
 
+# Through a proxy: METRICS_URL points at the server's own /metrics, LLM_API_KEY is sent as the bearer key (never printed).
+METRICS_URL = os.environ.get("METRICS_URL", url + "/metrics")
+HEADERS = {"Content-Type": "application/json"}
+if os.environ.get("LLM_API_KEY"):
+    HEADERS["Authorization"] = "Bearer " + os.environ["LLM_API_KEY"].strip()
+
+
 def metric(name):
-    with urllib.request.urlopen(url + "/metrics", timeout=30) as r:
+    with urllib.request.urlopen(METRICS_URL, timeout=30) as r:
         for line in r.read().decode().splitlines():
             if line.startswith(name):
                 return float(line.split()[-1])
@@ -29,7 +36,7 @@ def metric(name):
 def chat(msgs, max_tokens):
     req = {"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": 0, "stream": True,
            "stream_options": {"include_usage": True}, "chat_template_kwargs": {"enable_thinking": False}}
-    r = urllib.request.Request(url + "/v1/chat/completions", json.dumps(req).encode(), {"Content-Type": "application/json"})
+    r = urllib.request.Request(url + "/v1/chat/completions", json.dumps(req).encode(), HEADERS)
     t0 = time.time(); first = None; text = ""; usage = {}
     with urllib.request.urlopen(r, timeout=900) as resp:
         for raw in resp:
