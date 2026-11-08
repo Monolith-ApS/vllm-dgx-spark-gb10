@@ -7,17 +7,18 @@ An image is the official vLLM container with our patches on top. Build it on the
 ```bash
 scripts/build.sh qwen3.8-flash-next                # vLLM 0.32.0, the default
 VLLM=0.31 scripts/build.sh qwen3.8-flash-next      # vLLM 0.31.0
+VLLM=0.33 scripts/build.sh qwen3.8-flash-next      # vLLM 0.33.0, experimental
 ```
 
-The first gives the image `vllm-dgx-spark-gb10:qwen3.8-flash-next-vllm0.32`, the second `...-vllm0.31`. Both can be on the
+The first gives the image `vllm-dgx-spark-gb10:qwen3.8-flash-next-vllm0.32`, the others `...-vllm0.31` and `...-vllm0.33`. They can be on the
 machine at the same time; `scripts/run.sh` starts the one that matches `VLLM` (so use the same `VLLM` for build and run). A
 build takes about 20-30 minutes. What goes into the image: [architecture](../models/qwen3.8-flash-next/architecture.md#image-layers);
 the exact versions: [pins](../models/qwen3.8-flash-next/pins.md).
 
 ## Which vLLM release
 
-The two releases below are offered for Qwen3.8 Flash Next. The numbers are from all eight profiles on one DGX Spark; the full
-comparison is in [vLLM 0.31.0 or 0.32.0](../models/qwen3.8-flash-next/vllm-versions.md).
+The releases below are offered for Qwen3.8 Flash Next. The numbers are from all eight profiles on one DGX Spark; the full
+comparison is in [vLLM 0.31.0, 0.32.0 or 0.33.0](../models/qwen3.8-flash-next/vllm-versions.md).
 
 ### vLLM 0.32.0 (default)
 
@@ -44,6 +45,18 @@ Pros:
 Cons:
 - Starts about 7-9 s slower than 0.32.0 (about 127 s against 118 s until the server answers).
 - About 1-6 % less room for conversation memory (KV cache) than 0.32.0.
+
+### vLLM 0.33.0 (`VLLM=0.33`, experimental)
+
+Pros:
+- Measured from this repository's own build: all profiles, tool calling 18/18 and control prompts 4/4
+  ([measurements](../models/qwen3.8-flash-next/measurements.md)).
+- Decodes 2-5 % faster than 0.32.0 for one request, up to 9 % with all conversations at once.
+
+Cons:
+- 12-36 % less room for conversation memory (KV cache) than 0.32.0: only `640k-c2` and `1024k-c1` hold every conversation at
+  full length ([more](vllm-versions.md#what-we-found-in-vllm-0330)).
+- Needs the same two fixes as 0.32.0, the MTP one adapted to 0.33.
 
 ## Repository layout
 

@@ -12,6 +12,10 @@ requests went through an OpenAI-compatible proxy on the local network.
 In short: 0.32.0 decodes at the same speed as 0.31.0 (97-103 %), has a 2-6 % larger KV cache and a little more free memory.
 How to choose between them: [vllm-versions.md](vllm-versions.md).
 
+vLLM 0.33.0 (`VLLM=0.33`, experimental, measured on 2026-11-07 the same way, same machine and platform) has its own section at
+the end of each part. In short: it decodes 2-9 % faster than 0.32.0, but its KV cache is 12-36 % smaller, so only `640k-c2` and
+`1024k-c1` hold every conversation at full length.
+
 ## Words used on this page
 
 | Word | Meaning |
@@ -65,6 +69,19 @@ vary by a few percent, up to ~8 % for "new").
 | `768k-c2` | 4 | 76.0 / 79.7 / 84.4 | 114.1 / 119.0 / 126.1 (2) |
 | `1024k-c1` | 6 | 72.4 / 77.9 / 80.7 | same as 1 request (1 conversation) |
 
+**vLLM 0.33.0** (experimental), 3 runs per profile in one boot (percent = mean against 0.32.0):
+
+| Profile | Runs | 1 request, tok/s (min / mean / max) | All at once, total tok/s (min / mean / max) |
+|---|---|---|---|
+| `128k-c8` | 3 | 79.6 / 81.2 / 82.7 (102 %) | 229.7 / 248.3 / 278.4 (8) (107 %) |
+| `256k-c5` | 3 | 79.9 / 81.6 / 84.4 (104 %) | 182.9 / 192.6 / 204.8 (5) (109 %) |
+| `384k-c4` | 3 | 80.5 / 81.4 / 82.5 (105 %) | 164.3 / 171.0 / 178.3 (4) (106 %) |
+| `480k-c3` | 3 | 81.0 / 81.6 / 82.5 (102 %) | 136.7 / 143.0 / 158.3 (3) (102 %) |
+| `512k-c3` | 3 | 76.7 / 80.9 / 83.7 (102 %) | 134.5 / 143.6 / 149.3 (3) (99 %) |
+| `640k-c2` | 3 | 78.8 / 81.2 / 82.3 (104 %) | 108.3 / 119.0 / 124.7 (2) (102 %) |
+| `768k-c2` | 3 | 80.6 / 81.8 / 83.6 (103 %) | 119.1 / 122.6 / 130.5 (2) (102 %) |
+| `1024k-c1` | 3 | 75.7 / 79.1 / 82.0 (103 %) | same as 1 request (1 conversation) |
+
 The test sends one warm-up request first and then identical prompts, so the prefix cache is warm. A client that always sends new
 prompts has to compute them from scratch, so its first token takes longer; decode speed was not measured that way.
 
@@ -103,6 +120,24 @@ how much bigger the KV cache is than that.
 | `768k-c2` | 0.89 | 1,714,537 | 1,560,864 | +9.8 % | 760-769K x 2 | 0 | 8.1-8.7 s |
 | `1024k-c1` | 0.88 | 1,683,713 | 1,042,576 | +61.5 % | 1,028K x 1 | 0 | 5.7 s |
 
+**vLLM 0.33.0** (experimental). The fill test was run only where the KV cache holds every slot at full length; for the other
+six profiles a fill to full length cannot pass (the server has to preempt), so the profile works on 0.33.0 only with shorter
+conversations or fewer of them at once.
+
+| Profile | GPU memory utilization | KV cache size (tokens) | Needed (tokens) | Headroom | KV cache against 0.32.0 | Conversations filled to | Preemptions | Time to first token, last turn |
+|---|---|---|---|---|---|---|---|---|
+| `128k-c8` | 0.89 | 661,806 | 1,000,576 | -33.9 % | -36.1 % | not run | - | - |
+| `256k-c5` | 0.89 | 980,612 | 1,280,720 | -23.4 % | -29.1 % | not run | - | - |
+| `384k-c4` | 0.895 | 1,218,969 | 1,548,864 | -21.3 % | -23.0 % | not run | - | - |
+| `480k-c3` | 0.89 | 1,299,322 | 1,456,560 | -10.8 % | -20.4 % | not run | - | - |
+| `512k-c3` | 0.89 | 1,341,303 | 1,554,864 | -13.7 % | -19.2 % | not run | - | - |
+| `640k-c2` | 0.89 | 1,447,449 | 1,298,720 | +11.5 % | -15.9 % | 636-639K x 2 | 0 | 2.4-6.5 s |
+| `768k-c2` | 0.89 | 1,498,672 | 1,560,864 | -4.0 % | -15.0 % | not run | - | - |
+| `1024k-c1` | 0.88 | 1,556,976 | 1,042,576 | +49.3 % | -12.5 % | 1,028K x 1 | 0 | 7.8 s |
+
+The loss is 220-400K tokens per profile, largest for the profiles with the most slots. We have not found its cause yet. Free memory after
+start is also 0.3-1.1 GiB lower than on 0.32.0 (below), so raising `gpu_memory_utilization` is not the way to win it back.
+
 **Memory and start time.**
 
 **vLLM 0.32.0** (default):
@@ -118,6 +153,21 @@ how much bigger the KV cache is than that.
 | `768k-c2` | 0.89 | 6.8 GiB | 5.3 GiB | 127 s |
 | `1024k-c1` | 0.88 | 7.7 GiB | 6.2 GiB | 127 s |
 
+**vLLM 0.33.0** (experimental; "after the fill test" only where it ran):
+
+| Profile | GPU memory utilization | MemAvailable after start | MemAvailable after the fill test | Ready after |
+|---|---|---|---|---|
+| `128k-c8` | 0.89 | 5.0 GiB | - | 169 s (1) |
+| `256k-c5` | 0.89 | 5.5 GiB | - | 130 s |
+| `384k-c4` | 0.895 | 5.4 GiB | - | 130 s |
+| `480k-c3` | 0.89 | 6.2 GiB | - | 136 s |
+| `512k-c3` | 0.89 | 5.7 GiB | - | 130 s |
+| `640k-c2` | 0.89 | 5.9 GiB | 4.8 GiB | 127 s |
+| `768k-c2` | 0.89 | 6.4 GiB | - | 127 s |
+| `1024k-c1` | 0.88 | 7.2 GiB | 6.3 GiB | 130 s |
+
+(1) The first start of the new image on the machine.
+
 **vLLM 0.31.0**:
 
 | Profile | GPU memory utilization | MemAvailable after start | MemAvailable after the fill test | Ready after |
@@ -127,7 +177,7 @@ how much bigger the KV cache is than that.
 | `384k-c4` | 0.90 | 4.7 GiB | 3.9 GiB | 127 s |
 | `480k-c3` | 0.89 | 5.9 GiB | 4.9 GiB | 130 s |
 | `512k-c3` | 0.89 | 6.0 GiB | 5.0 GiB | 124 s |
-| `640k-c2` | 0.89 | 5.8 GiB (1) | 4.7 GiB | 127 s |
+| `640k-c2` | 0.89 | 5.8 GiB (2) | 4.7 GiB | 127 s |
 | `768k-c2` | 0.89 | 5.9 GiB | 4.7 GiB | 124 s |
 | `1024k-c1` | 0.88 | 7.7 GiB | 6.1 GiB | 127 s |
 
@@ -135,7 +185,7 @@ Free memory follows `gpu_memory_utilization`, not the context window: vLLM reser
 with KV cache, whatever the profile. Most profiles run at 0.89 and land within about 0.5 GiB of each other (on 0.31.0 `640k-c2`
 and `768k-c2` both 4.7 GiB after the fill test: 4,822 and 4,845 MiB); `384k-c4` (0.90) has less, `1024k-c1` (0.88) more.
 
-(1) The reading after start failed in this run; the value is from a second start of the same profile and image the same day
+(2) The reading after start failed in this run; the value is from a second start of the same profile and image the same day
 (the other profiles differed by at most 0.2 GiB between the two starts).
 
 Ready after = container start to API ready, with the weights in the page cache and the compile cache warm (an existing, stopped
@@ -156,7 +206,7 @@ has `align`.
 
 ## Tool calling and control prompts
 
-Every profile, on both releases: tool calling (`tools/tool_check.py`, 9 cases x 2) 18/18; control prompts
+Every profile, on all three releases: tool calling (`tools/tool_check.py`, 9 cases x 2) 18/18; control prompts
 (`tools/answer_check.py`) 4/4.
 
 ## Thinking on vs off
@@ -210,8 +260,8 @@ a task needs the reasoning. Ten tasks, one run each, is a small sample.
 Sampling used: thinking off `temperature 1.0, top_p 0.95, top_k 20`; thinking on `temperature 0.8, top_p 0.95, top_k 20,
 presence_penalty 1.0` (the image defaults).
 
-## vLLM 0.31 and 0.32
+## vLLM 0.31, 0.32 and 0.33
 
-This model's image is built on vLLM 0.32.0 by default, or on 0.31.0 with `VLLM=0.31` ([pins](pins.md)). How to choose, start-up
-times and the two problems we found in 0.32.0: [vllm-versions.md](vllm-versions.md); what we found in vLLM itself:
+This model's image is built on vLLM 0.32.0 by default, on 0.31.0 with `VLLM=0.31`, or on 0.33.0 with `VLLM=0.33` (experimental)
+([pins](pins.md)). How to choose, start-up times and the problems we found in 0.32.0 and 0.33.0: [vllm-versions.md](vllm-versions.md); what we found in vLLM itself:
 [docs/vllm-versions.md](../../docs/vllm-versions.md).

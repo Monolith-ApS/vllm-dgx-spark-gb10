@@ -1,6 +1,6 @@
 # cutedsl-warmup
 
-vLLM 0.32 only. Shortens start-up on GB10 by compiling only the CuTeDSL skinny-GEMM kernels that are actually used and not
+vLLM 0.32 and 0.33. Shortens start-up on GB10 by compiling only the CuTeDSL skinny-GEMM kernels that are actually used and not
 yet built.
 
 vLLM 0.32 compiles every skinny-GEMM configuration of the SM121 plans in its warm-up on every start (cute.compile results are

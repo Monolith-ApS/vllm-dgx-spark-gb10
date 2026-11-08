@@ -1,7 +1,7 @@
 # Qwen3.8 Flash Next: configuration
 
 How the scripts and environment variables work in general: [docs/configuration.md](../../docs/configuration.md). This page is what
-is specific to this model. The model runs on vLLM 0.32 (default) or 0.31 (`VLLM=0.31`, see [vllm-versions.md](vllm-versions.md));
+is specific to this model. The model runs on vLLM 0.32 (default), 0.31 (`VLLM=0.31`) or 0.33 (`VLLM=0.33`, experimental; see [vllm-versions.md](vllm-versions.md));
 the profiles and variables below are the same on both.
 
 ## Profiles

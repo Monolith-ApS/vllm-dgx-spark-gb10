@@ -26,6 +26,7 @@ Each row is a vLLM release with the patches on top of it. The example is Qwen3.8
 | 0.31.0 + GB10 layers | work | baseline | ~30 s / ~127 s | `VLLM=0.31` |
 | 0.32.0 + GB10 layers | crash at ~265K tokens | - | 50-57 s / - | not offered |
 | 0.32.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work | same as 0.31.0 (97-103 %) | 33-43 s / ~118 s | `VLLM=0.32` (default) |
+| 0.33.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work, but the KV cache is 12-36 % smaller | 99-109 % of 0.32.0 | - / 127-136 s | `VLLM=0.33` (experimental) |
 
 0.32.0 with both patches is 7-9 s faster to start and has a 1-6 % larger KV cache; it decodes at the same speed and needs
 two patches that 0.31.0 does not. The 0.32 row was first measured with an image of the same layers built outside this
@@ -42,6 +43,15 @@ Next, [numbers](../models/qwen3.8-flash-next/measurements.md)).
   draft the target's settings.
 - **Start-up warm-up.** Unpatched, 0.32.0 runs 53 warm-up steps at start instead of 9-11, so engine initialisation takes 50-57 s
   (0.31: about 30 s); with our patch, `gb10/cutedsl-warmup`, 33-43 s.
+
+## What we found in vLLM 0.33.0
+
+- **Smaller KV cache.** With the same command line and `gpu_memory_utilization`, 0.33.0 gives a 12-36 % smaller KV cache than
+  0.32.0 (220-400K tokens less per profile), and 0.3-1.1 GiB less free memory after start. For Qwen3.8 Flash Next that leaves
+  two of the eight profiles able to hold every conversation at full length. We have not found the cause yet.
+- **`--mamba-cache-mode` is gone** from the command line; the mode now follows prefix caching.
+- **The MTP draft rope problem of 0.32.0 is still there**; `gb10/mtp-draft-rope` has a version for 0.33's code.
+- Decode is 2-5 % faster for one request than on 0.32.0 (with the Marlin MoE kernels).
 
 ## Things to know when testing several vLLM builds
 

@@ -1,6 +1,6 @@
 # think-eos-guard
 
-Server-side fix for two reasoning-channel failures of Qwen3.8 (vLLM 0.30 to 0.32, `qwen3` reasoning parser):
+Server-side fix for two reasoning-channel failures of Qwen3.8 (vLLM 0.30 to 0.33, `qwen3` reasoning parser):
 
 1. The model samples EOS (`<|im_end|>`) inside an unfinished reasoning block. vLLM returns `finish_reason=stop` with the whole
    output in `reasoning_content`, empty `content` and no tool call. The guard resumes the generation from prompt + generated

@@ -66,7 +66,7 @@ Details per profile, and what the terms mean: [measurements](measurements.md).
 |---|---|
 | [configuration.md](configuration.md) | profile table with the memory settings, environment variables, thinking mode, tool calling |
 | [measurements.md](measurements.md) | decode speed, capacity, tool calling, thinking on vs off |
-| [vllm-versions.md](vllm-versions.md) | vLLM 0.32 (default) or 0.31 (`VLLM=0.31`): how to choose, and how they compare |
+| [vllm-versions.md](vllm-versions.md) | vLLM 0.32 (default), 0.31 (`VLLM=0.31`) or 0.33 (`VLLM=0.33`, experimental): how to choose, and how they compare |
 | [architecture.md](architecture.md) | image layers and the precision of every model component (diagrams) |
 | [pins.md](pins.md) | the exact versions the image is built from |
 

@@ -1,6 +1,6 @@
 # mtp-draft-rope
 
-vLLM 0.32 only. Gives the speculative MTP draft the same YaRN rope settings as the target model, so contexts above
+vLLM 0.32 and 0.33 (`apply_mtp_rope_v033.py` for 0.33's code). Gives the speculative MTP draft the same YaRN rope settings as the target model, so contexts above
 262,144 tokens work with MTP.
 
 ## Symptom
@@ -35,3 +35,7 @@ Qwen3.8 Flash Next on vLLM 0.32.0, built from this repository (2026-10-25): all 
 filled to the full context with 0 preemptions, tool calling 18/18, decode at the speed of 0.31.0
 ([numbers](../../models/qwen3.8-flash-next/measurements.md)). Without this layer every profile
 above 256K crashed at ~265K tokens (8 of 8 runs).
+
+Qwen3.8 Flash Next on vLLM 0.33.0, built from this repository (2026-11-07): `640k-c2` and `1024k-c1` filled to 636K x 2 and
+1,028K x 1 with 0 preemptions (the other profiles' KV cache is too small on 0.33.0 for a full fill, see
+[vllm-versions](../../docs/vllm-versions.md#what-we-found-in-vllm-0330)).
