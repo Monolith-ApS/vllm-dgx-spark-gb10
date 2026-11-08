@@ -50,14 +50,17 @@ BASE_ENV = {
 
 # What differs between the vLLM releases this image is built on (Dockerfile.vllm-<release>), as measured on the Spark.
 RELEASE_SETTINGS = {
-    "0.31": {"moe_backend": "marlin", "mamba_cache_mode": {}, "splitting_ops_after": {}},
+    "0.31": {"moe_backend": "marlin", "block_size": 1680, "mamba_cache_mode": {}, "splitting_ops_after": {}},
     # 0.32: the Humming MoE kernels (the backend the 0.32 measurements used), mamba cache mode "all" is gone ("align"
     # takes its place), and the QSA K/V prepare is a separate op that must be a graph split point like the QSA op.
-    "0.32": {"moe_backend": "humming", "mamba_cache_mode": {"all": "align"},
+    "0.32": {"moe_backend": "humming", "block_size": 1680, "mamba_cache_mode": {"all": "align"},
              "splitting_ops_after": {"vllm::qwen4_exp_ple_short_conv": "vllm::qwen4_exp_qsa_prepare_with_output"}},
     # 0.33: --mamba-cache-mode is gone from the command line (the mode follows prefix caching), so a profile's mamba cache mode is
     # not passed; Marlin MoE kernels (what 0.33 was measured with); the QSA prepare split point as on 0.32.
-    "0.33": {"moe_backend": "marlin", "mamba_cache_mode": None,
+    # Block size 3456 = 18 x 192: 0.33 rounds the attention block up to a multiple of lcm(--block-size, 64) in mamba align mode
+    # (1680 became 6720 and the mamba pages were padded 105 %), and the QSA ring capacity (12 with MTP 7, 8 with MTP 3) must
+    # divide the block, which rules out 3328; 3456 pads the mamba pages 5.6 % (MTP 7) / 8.3 % (MTP 3).
+    "0.33": {"moe_backend": "marlin", "block_size": 3456, "mamba_cache_mode": None,
              "splitting_ops_after": {"vllm::qwen4_exp_ple_short_conv": "vllm::qwen4_exp_qsa_prepare_with_output"}},
 }
 
@@ -117,7 +120,7 @@ def main():
             "-cc.cudagraph_mode=PIECEWISE", "-cc.splitting_ops=" + compact(splitting_ops), "--no-enable-flashinfer-autotune",
             "--kv-cache-dtype", "fp8_e4m3", "--kv-cache-dtype-skip-layers", "48",
             "--enable-auto-tool-choice", "--tool-call-parser", "qwen3_coder", "--reasoning-parser", "qwen3",
-            "--moe-backend", rs["moe_backend"], "--block-size", "1680", "--load-format", os.environ.get("LOAD_FORMAT", "instanttensor"),
+            "--moe-backend", rs["moe_backend"], "--block-size", str(rs["block_size"]), "--load-format", os.environ.get("LOAD_FORMAT", "instanttensor"),
             "--override-generation-config", compact(SAMPLING[thinking]),
             "--default-chat-template-kwargs", compact({"enable_thinking": thinking})]
     if p.get("mamba_cache_mode") and rs["mamba_cache_mode"] is not None:
