@@ -1,7 +1,7 @@
 # Pins
 
 Everything the image and the download depend on is fixed to an exact version, so a build today and a build next year give the
-same result. This model can be built on three vLLM releases (`VLLM=0.32`, the default, `VLLM=0.31`, or `VLLM=0.33`, experimental); each
+same result. This model can be built on three vLLM releases (`VLLM=0.33`, the default, `VLLM=0.32`, or `VLLM=0.31`); each
 has its own Dockerfile.
 
 | What | vLLM 0.31 (`Dockerfile.vllm-0.31`) | vLLM 0.32 (`Dockerfile.vllm-0.32`) | vLLM 0.33 (`Dockerfile.vllm-0.33`) |

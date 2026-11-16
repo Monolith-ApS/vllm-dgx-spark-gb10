@@ -5,9 +5,9 @@
 An image is the official vLLM container with our patches on top. Build it on the DGX Spark itself:
 
 ```bash
-scripts/build.sh qwen3.8-flash-next                # vLLM 0.32.0, the default
+scripts/build.sh qwen3.8-flash-next                # vLLM 0.33.0, the default
 VLLM=0.31 scripts/build.sh qwen3.8-flash-next      # vLLM 0.31.0
-VLLM=0.33 scripts/build.sh qwen3.8-flash-next      # vLLM 0.33.0, experimental
+VLLM=0.32 scripts/build.sh qwen3.8-flash-next      # vLLM 0.32.0
 ```
 
 The first gives the image `vllm-dgx-spark-gb10:qwen3.8-flash-next-vllm0.32`, the others `...-vllm0.31` and `...-vllm0.33`. They can be on the
@@ -20,7 +20,7 @@ the exact versions: [pins](../models/qwen3.8-flash-next/pins.md).
 The releases below are offered for Qwen3.8 Flash Next. The numbers are from all eight profiles on one DGX Spark; the full
 comparison is in [vLLM 0.31.0, 0.32.0 or 0.33.0](../models/qwen3.8-flash-next/vllm-versions.md).
 
-### vLLM 0.32.0 (default)
+### vLLM 0.32.0
 
 Pros:
 - Measured and verified from this repository's own build: all profiles, fill tests, tool calling
@@ -46,7 +46,7 @@ Cons:
 - Starts about 7-9 s slower than 0.32.0 (about 127 s against 118 s until the server answers).
 - About 1-6 % less room for conversation memory (KV cache) than 0.32.0.
 
-### vLLM 0.33.0 (`VLLM=0.33`, experimental)
+### vLLM 0.33.0 (`VLLM=0.33`, the default)
 
 Pros:
 - Measured from this repository's own build: all profiles, tool calling 18/18 and control prompts 4/4

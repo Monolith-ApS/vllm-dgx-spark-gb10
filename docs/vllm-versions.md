@@ -25,8 +25,8 @@ Each row is a vLLM release with the patches on top of it. The example is Qwen3.8
 |---|---|---|---|---|
 | 0.31.0 + GB10 layers | work | baseline | ~30 s / ~127 s | `VLLM=0.31` |
 | 0.32.0 + GB10 layers | crash at ~265K tokens | - | 50-57 s / - | not offered |
-| 0.32.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work | same as 0.31.0 (97-103 %) | 33-43 s / ~118 s | `VLLM=0.32` (default) |
-| 0.33.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work, but the KV cache is 12-36 % smaller | 99-109 % of 0.32.0 | - / 127-136 s | `VLLM=0.33` (experimental) |
+| 0.32.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work | same as 0.31.0 (97-103 %) | 33-43 s / ~118 s | `VLLM=0.32` |
+| 0.33.0 + GB10 layers + `mtp-draft-rope` + `cutedsl-warmup` | work; the KV pool is smaller, so the 128K and 384K profiles hold one conversation less (`128k-c7`, `384k-c3`) | 99-109 % of 0.32.0 | - / 127-136 s | `VLLM=0.33` (default) |
 
 0.32.0 with both patches is 7-9 s faster to start and has a 1-6 % larger KV cache; it decodes at the same speed and needs
 two patches that 0.31.0 does not. The 0.32 row was first measured with an image of the same layers built outside this

@@ -88,7 +88,9 @@ def main():
     name = os.environ.get("PROFILE", "512k-c3")
     if name == "list":
         for k, p in profiles.items():
-            print("%-10s context %7d  concurrency %d  gmu %-5g  %s" % (k, p["context"], p["concurrency"], p["gpu_memory_utilization"], p.get("status", "")))
+            if "releases" in p and vllm_release() not in p["releases"]:
+                continue
+            print("%-10s context %7d  concurrency %d  gmu %-5g  %s" % (k, p["context"], p["concurrency"], p.get("gpu_memory_utilization_by_release", {}).get(vllm_release(), p["gpu_memory_utilization"]), p.get("status", "")))
         return 0
     thinking = os.environ.get("THINKING", "0") == "1"
     if name.endswith("-think"):
@@ -96,6 +98,9 @@ def main():
     if name not in profiles:
         sys.exit("unknown PROFILE %r; choose one of: %s (each also as <name>-think)" % (name, ", ".join(profiles)))
     p = profiles[name]
+    if "releases" in p and vllm_release() not in p["releases"]:
+        offered = [k for k, v in profiles.items() if vllm_release() in v.get("releases", [vllm_release()])]
+        sys.exit("profile %r is not offered on vLLM %s (only on %s); choose one of: %s" % (name, vllm_release(), ", ".join(p["releases"]), ", ".join(offered)))
     ctx, seqs = int(p["context"]), int(p["concurrency"])
     model = os.environ.get("MODEL", "/models/Qwen3.8-Flash-Next-NVFP4")
     served = os.environ.get("SERVED_NAME", "qwen3.8-flash-next")

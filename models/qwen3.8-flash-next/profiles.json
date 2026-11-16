@@ -1,13 +1,110 @@
 {
-  "_comment": "context = tokens per conversation, concurrency = conversations at full context at the same time. status: measured = passed the full fill test (tools/fillc.py) with this image; not measured = expected to fit, not yet run.",
+  "_comment": "context = tokens per conversation, concurrency = conversations at full context at the same time. status: measured = passed the full fill test (tools/fillc.py) with this image; not measured = expected to fit, not yet run. releases = the vLLM releases a profile is offered on (all when absent): 0.33 holds fewer tokens in its KV pool, so its 128K and 384K profiles have one conversation less (128k-c7, 384k-c3).",
   "profiles": {
-    "128k-c8": {"context": 131072, "concurrency": 8, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "256k-c5": {"context": 262144, "concurrency": 5, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "384k-c4": {"context": 393216, "concurrency": 4, "gpu_memory_utilization": 0.895, "gpu_memory_utilization_by_release": {"0.31": 0.90}, "mamba_cache_mode": "all", "status": "measured"},
-    "480k-c3": {"context": 491520, "concurrency": 3, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "512k-c3": {"context": 524288, "concurrency": 3, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "640k-c2": {"context": 655360, "concurrency": 2, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "768k-c2": {"context": 786432, "concurrency": 2, "gpu_memory_utilization": 0.89, "mamba_cache_mode": "all", "status": "measured"},
-    "1024k-c1": {"context": 1048576, "concurrency": 1, "gpu_memory_utilization": 0.88, "mamba_cache_mode": "all", "status": "measured"}
+    "128k-c8": {
+      "context": 131072,
+      "concurrency": 8,
+      "gpu_memory_utilization": 0.89,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "releases": [
+        "0.31",
+        "0.32"
+      ]
+    },
+    "128k-c7": {
+      "context": 131072,
+      "concurrency": 7,
+      "gpu_memory_utilization": 0.88,
+      "mamba_cache_mode": "all",
+      "status": "measured on vLLM 0.33 (KV pool holds 7 at 128K; 8 does not fit)",
+      "releases": [
+        "0.33"
+      ]
+    },
+    "256k-c5": {
+      "context": 262144,
+      "concurrency": 5,
+      "gpu_memory_utilization": 0.89,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "gpu_memory_utilization_by_release": {
+        "0.33": 0.88
+      }
+    },
+    "384k-c4": {
+      "context": 393216,
+      "concurrency": 4,
+      "gpu_memory_utilization": 0.895,
+      "gpu_memory_utilization_by_release": {
+        "0.31": 0.9
+      },
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "releases": [
+        "0.31",
+        "0.32"
+      ]
+    },
+    "384k-c3": {
+      "context": 393216,
+      "concurrency": 3,
+      "gpu_memory_utilization": 0.88,
+      "mamba_cache_mode": "all",
+      "status": "measured on vLLM 0.33 (KV pool holds 3 at 384K; 4 does not fit)",
+      "releases": [
+        "0.33"
+      ]
+    },
+    "480k-c3": {
+      "context": 491520,
+      "concurrency": 3,
+      "gpu_memory_utilization": 0.89,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "gpu_memory_utilization_by_release": {
+        "0.33": 0.88
+      }
+    },
+    "512k-c3": {
+      "context": 524288,
+      "concurrency": 3,
+      "gpu_memory_utilization": 0.89,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "gpu_memory_utilization_by_release": {
+        "0.33": 0.88
+      }
+    },
+    "640k-c2": {
+      "context": 655360,
+      "concurrency": 2,
+      "gpu_memory_utilization": 0.89,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "gpu_memory_utilization_by_release": {
+        "0.33": 0.88
+      }
+    },
+    "768k-c2": {
+      "context": 786432,
+      "concurrency": 2,
+      "gpu_memory_utilization": 0.89,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "gpu_memory_utilization_by_release": {
+        "0.33": 0.88
+      }
+    },
+    "1024k-c1": {
+      "context": 1048576,
+      "concurrency": 1,
+      "gpu_memory_utilization": 0.88,
+      "mamba_cache_mode": "all",
+      "status": "measured",
+      "gpu_memory_utilization_by_release": {
+        "0.33": 0.88
+      }
+    }
   }
 }

@@ -1,7 +1,6 @@
 # Qwen3.8 Flash Next: vLLM 0.31.0, 0.32.0 or 0.33.0
 
-This model can be built and run on three vLLM releases. 0.32 is the default; 0.31 is chosen with `VLLM=0.31`, and 0.33
-(experimental, [see below](#vllm-0330-experimental)) with `VLLM=0.33`:
+This model can be built and run on three vLLM releases. 0.33 is the default; 0.32 is chosen with `VLLM=0.32` and 0.31 with `VLLM=0.31`:
 
 ```bash
 VLLM=0.31 scripts/install.sh qwen3.8-flash-next          # or step by step:
@@ -46,26 +45,34 @@ KV cache and 0.1-0.6 GiB more free memory after the fill test. Ready after (cont
 Without the two fixes, 0.32.0 does not run this model's profiles above 256K: every one of them crashed at ~265K tokens in the
 fill test (8 of 8 runs), and engine initialisation took 50-57 s instead of about 30 s.
 
-## vLLM 0.33.0 (experimental)
+## vLLM 0.33.0 (default)
 
-Built from this repository (`VLLM=0.33 scripts/build.sh`) and measured on all eight profiles on 2026-11-07, same machine, same
-tests. All numbers are in [measurements](measurements.md).
+Built from this repository (`scripts/build.sh`, `VLLM=0.33`). The first comparison below was measured on all eight profiles on
+2026-11-07, same machine, same tests, with the attention block size still at 1680; all numbers are in
+[measurements](measurements.md). The block size was changed to 3456 the day after (see below), so the KV pool figures in this
+table are the old ones.
 
-| | 0.32.0 (default) | 0.33.0 |
+| | 0.32.0 | 0.33.0 |
 |---|---|---|
 | Decode, 1 request | as in [measurements](measurements.md#decode-speed) | 102-105 % of 0.32.0 per profile |
 | Decode, all at once | as in [measurements](measurements.md#decode-speed) | 99-109 % of 0.32.0 per profile |
 | Tool calling / control prompts, every profile | 18/18, 4/4 | 18/18, 4/4 |
-| KV cache size | as in [measurements](measurements.md#capacity) | 12-36 % smaller (most with the most slots) |
-| Profiles whose KV cache holds every slot at full length | 8 of 8 | 2 of 8 (`640k-c2`, `1024k-c1`; both filled with 0 preemptions) |
-| MemAvailable after start | 6.1-7.7 GiB | 5.0-7.2 GiB |
+| KV cache size (block size 1680, before the fix) | as in [measurements](measurements.md#capacity) | 12-36 % smaller |
 | Ready after (container start to API ready, warm caches) | 121-133 s | 127-136 s |
 
-What changes on 0.33 in this repository: the MoE kernels are Marlin (as on 0.31), and `--mamba-cache-mode` is no longer a
-command-line option of vLLM, so a profile's mamba cache mode is not passed. The MTP draft rope fix and the CuTeDSL warm-up fix
-are still needed, the MTP fix adapted to 0.33's code (`apply_mtp_rope_v033.py`).
+What changes on 0.33 in this repository: the MoE kernels are Marlin (as on 0.31), `--mamba-cache-mode` is no longer a
+command-line option of vLLM, so a profile's mamba cache mode is not passed, and the attention block size is 3456 instead of
+1680 (0.33 rounds the block up to a multiple of lcm(`--block-size`, 64) in mamba align mode, so 1680 became 6720 and padded the
+mamba pages 105 %; 3456 pads them 5.6 %). The MTP draft rope fix and the CuTeDSL warm-up fix are still needed, the MTP fix
+adapted to 0.33's code (`apply_mtp_rope_v033.py`).
 
-So 0.33.0 is a little faster but holds fewer tokens: with the profiles as they are, six of the eight cannot keep all their
-conversations at full length at once, and the server would preempt (throw a conversation's cache away and recompute it later).
-That is why 0.32.0 stays the default. Use 0.33.0 for `640k-c2` or `1024k-c1`, or where the conversations stay well below the
-profile's context window.
+**Profiles on 0.33.** With the block size at 3456 the KV pool of `128k-c8` and `384k-c4` holds one conversation less, so on 0.33
+these two are `128k-c7` and `384k-c3` (`PROFILE=list` shows what a release offers; asking for the other name says which to
+use). The others are unchanged, with `gpu_memory_utilization` 0.88. On the machine this repository was developed on, every one
+of these profiles booted on 0.33 and passed the control prompts, tool calling and a capacity check through the switcher; the
+full fill test of `tools/fillc.py` has not been re-run on the image built from this repository since the block size changed.
+
+**Why 0.33 is the default.** Together with the content guard (see [configuration](configuration.md#very-long-conversations-content-guard))
+it is the setup that runs on the maintainers' own Spark: thinking off by default, MTP 7, FP8 KV cache with layer 48 kept in
+bf16, and long conversations (above about 175K tokens) answering to the end instead of stopping in the middle of a sentence.
+If your conversations need every slot of `128k-c8` or `384k-c4`, use `VLLM=0.32`.

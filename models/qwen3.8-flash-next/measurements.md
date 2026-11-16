@@ -12,7 +12,7 @@ requests went through an OpenAI-compatible proxy on the local network.
 In short: 0.32.0 decodes at the same speed as 0.31.0 (97-103 %), has a 2-6 % larger KV cache and a little more free memory.
 How to choose between them: [vllm-versions.md](vllm-versions.md).
 
-vLLM 0.33.0 (`VLLM=0.33`, experimental, measured on 2026-11-07 the same way, same machine and platform) has its own section at
+vLLM 0.33.0 (`VLLM=0.33`, measured on 2026-11-07 the same way, same machine and platform) has its own section at
 the end of each part. In short: it decodes 2-9 % faster than 0.32.0, but its KV cache is 12-36 % smaller, so only `640k-c2` and
 `1024k-c1` hold every conversation at full length.
 
@@ -69,7 +69,7 @@ vary by a few percent, up to ~8 % for "new").
 | `768k-c2` | 4 | 76.0 / 79.7 / 84.4 | 114.1 / 119.0 / 126.1 (2) |
 | `1024k-c1` | 6 | 72.4 / 77.9 / 80.7 | same as 1 request (1 conversation) |
 
-**vLLM 0.33.0** (experimental), 3 runs per profile in one boot (percent = mean against 0.32.0):
+**vLLM 0.33.0** (block size 1680), 3 runs per profile in one boot (percent = mean against 0.32.0):
 
 | Profile | Runs | 1 request, tok/s (min / mean / max) | All at once, total tok/s (min / mean / max) |
 |---|---|---|---|
@@ -120,7 +120,7 @@ how much bigger the KV cache is than that.
 | `768k-c2` | 0.89 | 1,714,537 | 1,560,864 | +9.8 % | 760-769K x 2 | 0 | 8.1-8.7 s |
 | `1024k-c1` | 0.88 | 1,683,713 | 1,042,576 | +61.5 % | 1,028K x 1 | 0 | 5.7 s |
 
-**vLLM 0.33.0** (experimental). The fill test was run only where the KV cache holds every slot at full length; for the other
+**vLLM 0.33.0** (block size 1680). The fill test was run only where the KV cache holds every slot at full length; for the other
 six profiles a fill to full length cannot pass (the server has to preempt), so the profile works on 0.33.0 only with shorter
 conversations or fewer of them at once.
 
@@ -153,7 +153,7 @@ start is also 0.3-1.1 GiB lower than on 0.32.0 (below), so raising `gpu_memory_u
 | `768k-c2` | 0.89 | 6.8 GiB | 5.3 GiB | 127 s |
 | `1024k-c1` | 0.88 | 7.7 GiB | 6.2 GiB | 127 s |
 
-**vLLM 0.33.0** (experimental; "after the fill test" only where it ran):
+**vLLM 0.33.0** (block size 1680; "after the fill test" only where it ran):
 
 | Profile | GPU memory utilization | MemAvailable after start | MemAvailable after the fill test | Ready after |
 |---|---|---|---|---|
@@ -262,6 +262,6 @@ presence_penalty 1.0` (the image defaults).
 
 ## vLLM 0.31, 0.32 and 0.33
 
-This model's image is built on vLLM 0.32.0 by default, on 0.31.0 with `VLLM=0.31`, or on 0.33.0 with `VLLM=0.33` (experimental)
+This model's image is built on vLLM 0.33.0 by default, on 0.32.0 with `VLLM=0.32`, or on 0.31.0 with `VLLM=0.31`
 ([pins](pins.md)). How to choose, start-up times and the problems we found in 0.32.0 and 0.33.0: [vllm-versions.md](vllm-versions.md); what we found in vLLM itself:
 [docs/vllm-versions.md](../../docs/vllm-versions.md).

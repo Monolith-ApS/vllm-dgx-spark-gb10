@@ -7,8 +7,8 @@ DGX OS ships docker and the toolkit.
 The scripts are the same for every model. They take the model's name as the first argument; with only one model in the
 repository the name can be left out. The examples use `qwen3.8-flash-next`.
 
-`VLLM=<release>` in front of any script picks the vLLM release, when the model offers more than one (Qwen3.8 Flash Next: `0.32`,
-the default, `0.31`, or `0.33` (experimental); see [its comparison](../models/qwen3.8-flash-next/vllm-versions.md)). Use the same `VLLM` for build
+`VLLM=<release>` in front of any script picks the vLLM release, when the model offers more than one (Qwen3.8 Flash Next: `0.33`,
+the default, `0.32`, or `0.31`; see [its comparison](../models/qwen3.8-flash-next/vllm-versions.md)). Use the same `VLLM` for build
 and run.
 
 ## One command
