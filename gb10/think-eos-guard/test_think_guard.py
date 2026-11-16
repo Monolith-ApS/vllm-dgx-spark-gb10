@@ -202,5 +202,90 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(text_of(rs), "x</think>")
 
 
+CLOSED = [5, OPEN, NL, END, NL, NL]  # thinking closed in the prompt (thinking off)
+
+
+class ContentGuardTests(unittest.TestCase):
+    """content mode, thinking off, long prompt, EOS in the middle of a sentence is resumed."""
+
+    def setUp(self):
+        os.environ["THINK_GUARD_CONTENT"] = "1"
+        os.environ["THINK_GUARD_CONTENT_MIN_PROMPT"] = "5"
+
+    def tearDown(self):
+        os.environ.pop("THINK_GUARD_CONTENT", None)
+        os.environ.pop("THINK_GUARD_CONTENT_MIN_PROMPT", None)
+
+    def test_off_by_default(self):
+        del os.environ["THINK_GUARD_CONTENT"]
+        e = Engine([[("Du har ret", [1, 2, IM_END], "stop")]])
+        run(e, prompt=CLOSED)
+        self.assertEqual(len(e.calls), 1)
+
+    def test_mid_sentence_eos_is_resumed(self):
+        e = Engine([[("Du har", [1, 2], None), ("", [IM_END], "stop")], [(" ret.", [3, 4, IM_END], "stop")]])
+        rs = run(e, prompt=CLOSED)
+        self.assertEqual(len(e.calls), 2)
+        self.assertEqual(e.calls[1]["prompt"], CLOSED + [1, 2])
+        self.assertEqual(e.calls[1]["params"].min_tokens, 12)
+        self.assertEqual(text_of(rs), "Du har ret.")
+        self.assertEqual(rs[-1].outputs[0].finish_reason, "stop")
+
+    def test_finished_sentence_is_not_resumed(self):
+        for tail in (".", "!", "?", "`", ")", "\n"):
+            e = Engine([[("Det er klaret" + tail, [1, 2, IM_END], "stop")]])
+            run(e, prompt=CLOSED)
+            self.assertEqual(len(e.calls), 1, tail)
+
+    def test_thinking_on_answer_ending_mid_sentence_is_resumed(self):
+        # thinking open in the prompt, genuine close, then the answer ends on EOS mid-sentence
+        e = Engine([[("plan", [1], None), ("\n</think>\n\nDu har", [NL, END, 2, IM_END], "stop")], [(" ret.", [3, IM_END], "stop")]])
+        rs = run(e, prompt=PROMPT + [9, 9])
+        self.assertEqual(len(e.calls), 2)
+        self.assertEqual(text_of(rs), "plan\n</think>\n\nDu har ret.")
+        # a finished answer is left alone
+        e = Engine([[("plan\n</think>\n\nKlar.", [1, NL, END, 2, IM_END], "stop")]])
+        run(e, prompt=PROMPT + [9, 9])
+        self.assertEqual(len(e.calls), 1)
+
+    def test_trailing_space_is_unfinished_but_newline_is_finished(self):
+        e = Engine([[("og den gamle ", [1, IM_END], "stop")], [("IP.", [2, IM_END], "stop")]])
+        run(e, prompt=CLOSED)
+        self.assertEqual(len(e.calls), 2)
+        e = Engine([[("Det er klaret.\n", [1, IM_END], "stop")]])
+        run(e, prompt=CLOSED)
+        self.assertEqual(len(e.calls), 1)
+
+    def test_colon_and_comma_count_as_unfinished(self):
+        for tail in (":", ",", "-"):
+            e = Engine([[("Her er det" + tail, [1, IM_END], "stop")], [(" ok.", [2, IM_END], "stop")]])
+            run(e, prompt=CLOSED)
+            self.assertEqual(len(e.calls), 2, tail)
+
+    def test_short_prompt_is_not_guarded(self):
+        os.environ["THINK_GUARD_CONTENT_MIN_PROMPT"] = "1000"
+        e = Engine([[("Du har", [1, 2, IM_END], "stop")]])
+        run(e, prompt=CLOSED)
+        self.assertEqual(len(e.calls), 1)
+
+    def test_tool_call_is_not_resumed_and_quoted_tag_is_untouched(self):
+        e = Engine([[("<tool_call>\n<function=f>", [TOOLT, 2], None), ("", [IM_END], "stop")]])
+        run(e, prompt=CLOSED)
+        self.assertEqual(len(e.calls), 1)
+        e = Engine([[("He wrote </think> end.", [1, END, 2, IM_END], "stop")]])
+        rs = run(e, prompt=CLOSED)
+        self.assertEqual(text_of(rs), "He wrote </think> end.")
+
+    def test_resume_budget_is_limited(self):
+        os.environ["THINK_GUARD_MAX_RESUMES"] = "2"
+        try:
+            e = Engine([[("a", [1, IM_END], "stop")], [("b", [2, IM_END], "stop")], [("c", [3, IM_END], "stop")]])
+            rs = run(e, prompt=CLOSED)
+        finally:
+            del os.environ["THINK_GUARD_MAX_RESUMES"]
+        self.assertEqual(len(e.calls), 3)
+        self.assertEqual(text_of(rs), "abc")
+
+
 if __name__ == "__main__":
     unittest.main()
