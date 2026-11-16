@@ -46,6 +46,9 @@ BASE_ENV = {
     # GB10 decode layer: bf16 linears -> FP8 rows, GDN projections -> NVFP4 rows (LM head FP8, shared gate, router tier are on by default)
     "VLLM_GB10_FP8_WEIGHTS": "1",
     "VLLM_GB10_FP4_WEIGHTS": "1",
+    # think-eos-guard content guard (gb10/think-eos-guard): from a prompt of 120000 tokens on, a turn that ends on EOS in the
+    # middle of a sentence is resumed (the model otherwise stops after a few tokens in very long conversations)
+    "THINK_GUARD_CONTENT": "1", "THINK_GUARD_MAX_RESUMES": "30", "THINK_GUARD_MIN_TOKENS": "16",
 }
 
 # What differs between the vLLM releases this image is built on (Dockerfile.vllm-<release>), as measured on the Spark.

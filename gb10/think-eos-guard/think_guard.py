@@ -51,6 +51,19 @@ def guard_enabled() -> bool:
     return os.environ.get("THINK_GUARD", "1") != "0"
 
 
+def content_guard_enabled() -> bool:
+    """Also guard answers WITHOUT reasoning (thinking off) against a premature EOS in the middle of a sentence. Off by default."""
+    return os.environ.get("THINK_GUARD_CONTENT", "0") == "1"
+
+
+# Last visible character that means "the sentence is not finished": letters, digits and joining punctuation.
+_MID_PUNCT = ",;:-–—(["
+
+
+def mid_sentence(ch: str) -> bool:
+    return bool(ch) and (ch.isalnum() or ch in _MID_PUNCT or ch in " \t")
+
+
 class Guard:
     """Per-request state. Built from the tokenizer and the rendered prompt; `active` is False when the guard does not apply
     (thinking closed in the prompt, or the vocabulary lacks the tags)."""
@@ -78,10 +91,23 @@ class Guard:
         self.tool_seen = False
         self.tail = "\n"  # the prompt ends "<think>\n"
         self.rewritten = 0
+        self.content_mode = False
+        self.long_prompt = content_guard_enabled() and len(prompt_ids) >= _env_int("THINK_GUARD_CONTENT_MIN_PROMPT", 120000)
+        if not self.active and self.long_prompt:
+            # thinking is closed in the prompt (thinking off); watch the visible answer instead of a reasoning block
+            self.content_mode = True
+            self.active = True
+            self.closed = True
 
     def sanitize(self, text: str, ids: list[int]) -> tuple[str, list[int]]:
         """Rewrite quoted closing tags in one output delta; track the genuine close and tool calls."""
         if not text and not ids:
+            return text, ids
+        if self.content_mode:
+            if TOOL in text:
+                self.tool_seen = True
+            if text:
+                self.tail = "\n" if text[-1] in "\r\n" else text[-1]  # a trailing newline means the answer was finished, a trailing space does not
             return text, ids
         has_id = self.end_id in ids
         if not has_id and TAG not in text:
@@ -125,7 +151,13 @@ class Guard:
 
     def premature(self, raw_ids: list[int]) -> bool:
         """True when the engine ended on EOS while the reasoning block is still open."""
-        return bool(self.active and not self.closed and not self.tool_seen and raw_ids and raw_ids[-1] in self.eos_ids)
+        if self.content_mode:
+            return bool(not self.tool_seen and raw_ids and raw_ids[-1] in self.eos_ids and mid_sentence(self.tail))
+        ended = bool(raw_ids and raw_ids[-1] in self.eos_ids and not self.tool_seen)
+        if self.active and self.closed and self.long_prompt:
+            # thinking was on and the reasoning has closed: the answer itself may end in the middle of a sentence.
+            return bool(ended and mid_sentence(self.tail))
+        return bool(self.active and not self.closed and ended)
 
 
 def applicable(sampling_params: Any, engine_input: Any, request: Any) -> bool:
@@ -210,7 +242,7 @@ async def _guarded(generate, engine_input, sampling_params, request_id, gen_kwar
         if not resume:
             return
         attempt += 1
-        logger.warning("think-guard %s: EOS inside open reasoning after %d generated tokens, resuming (attempt %d/%d)", request_id, len(raw_ids), attempt, max_resumes)
+        logger.warning("think-guard %s: EOS %s after %d generated tokens, resuming (attempt %d/%d)", request_id, "mid-sentence in the answer" if g.content_mode else "inside open reasoning", len(raw_ids), attempt, max_resumes)
         cur_input = {"type": "token", "prompt_token_ids": orig_prompt + raw_ids}
         if engine_input.get("cache_salt") is not None:
             cur_input["cache_salt"] = engine_input["cache_salt"]

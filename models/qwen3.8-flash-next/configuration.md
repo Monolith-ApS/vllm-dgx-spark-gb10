@@ -41,6 +41,15 @@ Read by `scripts/run.sh` and passed on to the container (the general variables -
 
 Arguments after the image name in `docker run` are appended to the vLLM command line.
 
+## Very long conversations (content guard)
+
+Without thinking, this model can stop in the middle of a sentence once a conversation passes about 175K tokens (on one Spark,
+a real 815-message agent session of 189K tokens ended after 4 to 120 tokens in 7 to 10 of 10 runs; at 169K it was fine). The
+image therefore runs with the content guard of [think-eos-guard](../../gb10/think-eos-guard/README.md#content-guard-optional)
+switched on: `THINK_GUARD_CONTENT=1`, `THINK_GUARD_MAX_RESUMES=30`, `THINK_GUARD_MIN_TOKENS=16` (set in `serve.py`). It only does
+anything when the prompt has 120000 tokens or more; shorter prompts are not touched. Set `THINK_GUARD_CONTENT=0` (add
+`THINK_GUARD_CONTENT` to `PASS_ENV` in `model.env`, or `-e THINK_GUARD_CONTENT=0` on `docker run`) to turn it off.
+
 ## Thinking mode
 
 Per request:
